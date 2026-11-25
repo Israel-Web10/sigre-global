@@ -1,0 +1,7 @@
+Esta carpeta guarda la configuración local de SIGRE Global:
+
+  bd.properties         conexión a PostgreSQL (puerto 5434) y claves de los roles sigre_owner, app_rw y app_ro
+  seguridad.properties  clave para firmar los tokens JWT
+
+No se suben al repositorio. La primera vez que se ejecuta iniciar.bat (o scripts\bd.ps1),
+el script scripts\configurar.ps1 los crea con claves aleatorias.

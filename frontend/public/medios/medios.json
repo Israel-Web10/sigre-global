@@ -1,0 +1,140 @@
+[
+ {
+  "archivo": "/medios/recorrido-sigre-global.mp4",
+  "titulo": "Recorrido general del sistema",
+  "tipo": "video",
+  "descripcion": "Ingreso, tablero, riesgos, aprobación, alertas, KRI, integraciones y arquitectura"
+ },
+ {
+  "archivo": "/medios/gif-alerta-tiempo-real.gif",
+  "titulo": "Alerta en tiempo real (CU06–CU07)",
+  "tipo": "gif",
+  "descripcion": "El SIEM publica un valor fuera de umbral, el trigger genera la alerta y llega al navegador"
+ },
+ {
+  "archivo": "/medios/gif-aprobacion-cu04.gif",
+  "titulo": "Aprobación del tratamiento (CU04)",
+  "tipo": "gif",
+  "descripcion": "Lista de verificación del aprobador con las reglas de negocio"
+ },
+ {
+  "archivo": "/medios/gif-bitacora-inalterable.gif",
+  "titulo": "Bitácora inalterable (RN13)",
+  "tipo": "gif",
+  "descripcion": "Ni el rol de la aplicación ni el dueño del esquema pueden modificarla"
+ },
+ {
+  "archivo": "/medios/gif-evaluacion-p03.gif",
+  "titulo": "Evaluación del riesgo (P03)",
+  "tipo": "gif",
+  "descripcion": "Nivel, conversión a USD y validación requerida calculados en vivo"
+ },
+ {
+  "archivo": "/medios/gif-ingreso-tablero.gif",
+  "titulo": "Ingreso y tablero ejecutivo",
+  "tipo": "gif",
+  "descripcion": "Acceso rápido por rol y animación del tablero P01"
+ },
+ {
+  "archivo": "/medios/gif-vista-movil.gif",
+  "titulo": "Aplicación móvil (PWA)",
+  "tipo": "gif",
+  "descripcion": "La misma aplicación adaptada al teléfono"
+ },
+ {
+  "archivo": "/medios/capturas/01-ingreso.webp",
+  "titulo": "Inicio de sesión",
+  "tipo": "imagen",
+  "descripcion": "Globo 3D de las filiales y acceso rápido por rol"
+ },
+ {
+  "archivo": "/medios/capturas/02-tablero.webp",
+  "titulo": "Tablero ejecutivo (P01)",
+  "tipo": "imagen",
+  "descripcion": "Indicadores, red de filiales, mapa de calor y tendencias"
+ },
+ {
+  "archivo": "/medios/capturas/03-riesgos.webp",
+  "titulo": "Catálogo de riesgos",
+  "tipo": "imagen",
+  "descripcion": "Filtros por categoría, estado, nivel y filial (RN14)"
+ },
+ {
+  "archivo": "/medios/capturas/04-riesgo.webp",
+  "titulo": "Ficha del riesgo",
+  "tipo": "imagen",
+  "descripcion": "Flujo de estados D08, evaluación, tratamiento e historial"
+ },
+ {
+  "archivo": "/medios/capturas/05-aprobacion.webp",
+  "titulo": "Aprobación del tratamiento (CU04)",
+  "tipo": "imagen",
+  "descripcion": "Lista de verificación con RN03, RN04, RN05, RN12 y RN16"
+ },
+ {
+  "archivo": "/medios/capturas/06-alertas.webp",
+  "titulo": "Centro de alertas",
+  "tipo": "imagen",
+  "descripcion": "Tablero por estado con la cuenta regresiva del SLA (RN07)"
+ },
+ {
+  "archivo": "/medios/capturas/07-kri.webp",
+  "titulo": "Indicadores KRI",
+  "tipo": "imagen",
+  "descripcion": "Medidores con semáforo y series del ERP y el SIEM"
+ },
+ {
+  "archivo": "/medios/capturas/08-integraciones.webp",
+  "titulo": "Integraciones en vivo",
+  "tipo": "imagen",
+  "descripcion": "ERP, SIEM, servicio normativo y consola de eventos"
+ },
+ {
+  "archivo": "/medios/capturas/09-auditorias.webp",
+  "titulo": "Plan anual de auditorías",
+  "tipo": "imagen",
+  "descripcion": "Cronograma y hallazgos (CU10, CU11)"
+ },
+ {
+  "archivo": "/medios/capturas/10-cumplimiento.webp",
+  "titulo": "Cumplimiento normativo",
+  "tipo": "imagen",
+  "descripcion": "Obligaciones por filial con avisos de vencimiento (RN09)"
+ },
+ {
+  "archivo": "/medios/capturas/11-bitacora.webp",
+  "titulo": "Bitácora inalterable",
+  "tipo": "imagen",
+  "descripcion": "Registros de los triggers con valores antes y después (RN13)"
+ },
+ {
+  "archivo": "/medios/capturas/12-arquitectura.webp",
+  "titulo": "Arquitectura y diseño",
+  "tipo": "imagen",
+  "descripcion": "Capas en ejecución, triggers y diagramas del informe"
+ },
+ {
+  "archivo": "/medios/capturas/13-administracion.webp",
+  "titulo": "Administración",
+  "tipo": "imagen",
+  "descripcion": "Usuarios, roles, apetito por filial y parámetros (CU15)"
+ },
+ {
+  "archivo": "/medios/capturas/14-validacion.webp",
+  "titulo": "Validación financiera (P02)",
+  "tipo": "imagen",
+  "descripcion": "Contraste con el tipo de cambio del ERP y control RN17"
+ },
+ {
+  "archivo": "/medios/capturas/15-conciliacion.webp",
+  "titulo": "Conciliación con el ERP (CU18)",
+  "tipo": "imagen",
+  "descripcion": "Valor del sistema frente al cierre contable y tolerancia RN18"
+ },
+ {
+  "archivo": "/medios/capturas/16-movil.webp",
+  "titulo": "Vista móvil (PWA)",
+  "tipo": "imagen",
+  "descripcion": "La misma aplicación dentro de un teléfono"
+ }
+]

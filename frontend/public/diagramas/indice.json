@@ -1,0 +1,258 @@
+[
+ {
+  "numero": 1,
+  "titulo": "Cronograma del proyecto",
+  "archivo": "/diagramas/figura-01.webp",
+  "pagina": 10,
+  "ancho": 1800,
+  "alto": 828
+ },
+ {
+  "numero": 2,
+  "titulo": "Proceso actual de gestión de riesgos, auditoría y cumplimiento",
+  "archivo": "/diagramas/figura-02.webp",
+  "pagina": 14,
+  "ancho": 1209,
+  "alto": 706
+ },
+ {
+  "numero": 3,
+  "titulo": "Matriz de probabilidad por impacto",
+  "archivo": "/diagramas/figura-03.webp",
+  "pagina": 20,
+  "ancho": 906,
+  "alto": 624
+ },
+ {
+  "numero": 4,
+  "titulo": "Funcionamiento de las alertas",
+  "archivo": "/diagramas/figura-04.webp",
+  "pagina": 21,
+  "ancho": 1209,
+  "alto": 427
+ },
+ {
+  "numero": 5,
+  "titulo": "Diagrama de casos de uso",
+  "archivo": "/diagramas/figura-05.webp",
+  "pagina": 26,
+  "ancho": 1800,
+  "alto": 2252
+ },
+ {
+  "numero": 6,
+  "titulo": "Diagrama de clases: vista general",
+  "archivo": "/diagramas/figura-06.webp",
+  "pagina": 34,
+  "ancho": 1800,
+  "alto": 857
+ },
+ {
+  "numero": 7,
+  "titulo": "Diagrama de clases D02-A: seguridad y riesgos",
+  "archivo": "/diagramas/figura-07.webp",
+  "pagina": 35,
+  "ancho": 1800,
+  "alto": 2274
+ },
+ {
+  "numero": 8,
+  "titulo": "Diagrama de clases D02-B: monitoreo, auditorías y validación financiera",
+  "archivo": "/diagramas/figura-08.webp",
+  "pagina": 36,
+  "ancho": 1800,
+  "alto": 1669
+ },
+ {
+  "numero": 9,
+  "titulo": "Diagrama de clases D02-C: cumplimiento normativo",
+  "archivo": "/diagramas/figura-09.webp",
+  "pagina": 37,
+  "ancho": 1800,
+  "alto": 1494
+ },
+ {
+  "numero": 10,
+  "titulo": "Diagrama de secuencia de CU04, Aprobar tratamiento del riesgo",
+  "archivo": "/diagramas/figura-10.webp",
+  "pagina": 38,
+  "ancho": 1800,
+  "alto": 1701
+ },
+ {
+  "numero": 11,
+  "titulo": "Diagrama de secuencia del monitoreo de indicadores y alertas",
+  "archivo": "/diagramas/figura-11.webp",
+  "pagina": 39,
+  "ancho": 1209,
+  "alto": 666
+ },
+ {
+  "numero": 12,
+  "titulo": "Diagrama de secuencia de CU11, Registrar hallazgo",
+  "archivo": "/diagramas/figura-12.webp",
+  "pagina": 39,
+  "ancho": 1209,
+  "alto": 552
+ },
+ {
+  "numero": 13,
+  "titulo": "Diagrama de secuencia de CU17, Validar impacto financiero",
+  "archivo": "/diagramas/figura-13.webp",
+  "pagina": 40,
+  "ancho": 1800,
+  "alto": 1275
+ },
+ {
+  "numero": 14,
+  "titulo": "Diagrama de actividad de CU04",
+  "archivo": "/diagramas/figura-14.webp",
+  "pagina": 41,
+  "ancho": 1800,
+  "alto": 1851
+ },
+ {
+  "numero": 15,
+  "titulo": "Diagrama de actividad de la gestión de alertas",
+  "archivo": "/diagramas/figura-15.webp",
+  "pagina": 42,
+  "ancho": 1133,
+  "alto": 925
+ },
+ {
+  "numero": 16,
+  "titulo": "Diagrama de estados del riesgo",
+  "archivo": "/diagramas/figura-16.webp",
+  "pagina": 43,
+  "ancho": 1795,
+  "alto": 1760
+ },
+ {
+  "numero": 17,
+  "titulo": "Diagrama de estados de la alerta",
+  "archivo": "/diagramas/figura-17.webp",
+  "pagina": 43,
+  "ancho": 1209,
+  "alto": 419
+ },
+ {
+  "numero": 18,
+  "titulo": "Diagrama de objetos",
+  "archivo": "/diagramas/figura-18.webp",
+  "pagina": 45,
+  "ancho": 1757,
+  "alto": 2969
+ },
+ {
+  "numero": 19,
+  "titulo": "Diagrama de comunicación de CU04",
+  "archivo": "/diagramas/figura-19.webp",
+  "pagina": 46,
+  "ancho": 1800,
+  "alto": 504
+ },
+ {
+  "numero": 20,
+  "titulo": "Diagrama de tiempos de una alerta crítica",
+  "archivo": "/diagramas/figura-20.webp",
+  "pagina": 46,
+  "ancho": 1209,
+  "alto": 515
+ },
+ {
+  "numero": 21,
+  "titulo": "Diagrama de flujo de datos de nivel 0",
+  "archivo": "/diagramas/figura-21.webp",
+  "pagina": 47,
+  "ancho": 1800,
+  "alto": 1322
+ },
+ {
+  "numero": 22,
+  "titulo": "Diagrama de flujo de datos de nivel 1",
+  "archivo": "/diagramas/figura-22.webp",
+  "pagina": 48,
+  "ancho": 1330,
+  "alto": 2733
+ },
+ {
+  "numero": 23,
+  "titulo": "Diagrama de flujo de datos de nivel 2 del proceso 3.0",
+  "archivo": "/diagramas/figura-23.webp",
+  "pagina": 49,
+  "ancho": 1800,
+  "alto": 518
+ },
+ {
+  "numero": 24,
+  "titulo": "Modelo entidad-relación",
+  "archivo": "/diagramas/figura-24.webp",
+  "pagina": 51,
+  "ancho": 1800,
+  "alto": 3434
+ },
+ {
+  "numero": 25,
+  "titulo": "Arquitectura lógica en capas",
+  "archivo": "/diagramas/figura-25.webp",
+  "pagina": 52,
+  "ancho": 1209,
+  "alto": 656
+ },
+ {
+  "numero": 26,
+  "titulo": "Diagrama de componentes",
+  "archivo": "/diagramas/figura-26.webp",
+  "pagina": 52,
+  "ancho": 1800,
+  "alto": 799
+ },
+ {
+  "numero": 27,
+  "titulo": "Diagrama de paquetes",
+  "archivo": "/diagramas/figura-27.webp",
+  "pagina": 53,
+  "ancho": 1800,
+  "alto": 1740
+ },
+ {
+  "numero": 28,
+  "titulo": "Diagrama de despliegue",
+  "archivo": "/diagramas/figura-28.webp",
+  "pagina": 54,
+  "ancho": 1800,
+  "alto": 1187
+ },
+ {
+  "numero": 29,
+  "titulo": "Mapa de procesos propuesto",
+  "archivo": "/diagramas/figura-29.webp",
+  "pagina": 55,
+  "ancho": 1800,
+  "alto": 936
+ },
+ {
+  "numero": 30,
+  "titulo": "Prototipo P01: tablero global de riesgos",
+  "archivo": "/diagramas/figura-30.webp",
+  "pagina": 69,
+  "ancho": 1520,
+  "alto": 980
+ },
+ {
+  "numero": 31,
+  "titulo": "Prototipo P02: validación del impacto financiero (CU17)",
+  "archivo": "/diagramas/figura-31.webp",
+  "pagina": 69,
+  "ancho": 1520,
+  "alto": 980
+ },
+ {
+  "numero": 32,
+  "titulo": "Prototipo P03: evaluación de un riesgo (CU02)",
+  "archivo": "/diagramas/figura-32.webp",
+  "pagina": 70,
+  "ancho": 1520,
+  "alto": 980
+ }
+]

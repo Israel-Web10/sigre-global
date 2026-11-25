@@ -1,0 +1,20 @@
+# Dependencias y resultados de compilación
+frontend/node_modules/
+frontend/dist/
+backend/target/
+
+# Configuración local con claves: la genera scripts\configurar.ps1 en cada equipo
+config/bd.properties
+config/seguridad.properties
+
+# Temporales
+multimedia/_temporal/
+*.log
+*.tmp
+
+# Editores y sistema operativo
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db

@@ -1,0 +1,94 @@
+# SIGRE Global - configuración de la API
+# Las credenciales de la base de datos y la clave JWT se leen de la carpeta config del proyecto.
+spring:
+  application:
+    name: sigre-global
+  config:
+    import:
+      - optional:file:./config/bd.properties
+      - optional:file:../config/bd.properties
+      - optional:file:./config/seguridad.properties
+      - optional:file:../config/seguridad.properties
+  datasource:
+    url: jdbc:postgresql://${sigre.bd.host}:${sigre.bd.puerto}/${sigre.bd.nombre}
+    username: ${sigre.bd.app}
+    password: ${sigre.bd.app-clave}
+    hikari:
+      maximum-pool-size: 12
+      pool-name: sigre-pool
+  flyway:
+    url: jdbc:postgresql://${sigre.bd.host}:${sigre.bd.puerto}/${sigre.bd.nombre}
+    user: ${sigre.bd.owner}
+    password: ${sigre.bd.owner-clave}
+    locations: classpath:db/migration
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: none
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: America/La_Paz
+  jackson:
+    time-zone: America/La_Paz
+    serialization:
+      write-dates-as-timestamps: false
+    default-property-inclusion: always
+  servlet:
+    multipart:
+      max-file-size: 15MB
+      max-request-size: 20MB
+  mvc:
+    async:
+      request-timeout: -1
+  task:
+    scheduling:
+      pool:
+        size: 4
+      thread-name-prefix: sigre-tarea-
+
+server:
+  port: 8090
+  compression:
+    enabled: true
+    mime-types: application/json,text/html,text/css,application/javascript,image/svg+xml
+  error:
+    include-message: always
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /api-docs/ui.html
+    operations-sorter: alpha
+    tags-sorter: alpha
+
+sigre:
+  zona-horaria: America/La_Paz
+  # Modo demostración: muestra los usuarios de prueba en el inicio de sesión
+  # y habilita el simulador de integraciones (ERP y SIEM).
+  demo:
+    habilitado: true
+    clave-usuarios: Sigre#2026
+  evidencias:
+    carpeta: ${user.home}/AppData/Local/SIGRE-Global/evidencias
+  tareas:
+    # El informe define una revisión por hora (RN07); en la demostración se revisa cada minuto.
+    escalamiento-ms: 60000
+    alertas-programadas-ms: 120000
+    notificacion-ms: 5000
+
+logging:
+  level:
+    root: INFO
+    bo.umsa.sigre: INFO
+    org.hibernate.SQL: WARN

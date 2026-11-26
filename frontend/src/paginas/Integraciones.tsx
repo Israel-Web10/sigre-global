@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Activity, Database, Mail, Network, Power, Radio, ServerCog, ShieldCheck, Timer, Waypoints } from 'lucide-react';
+import { Activity, CircleCheck, Database, Mail, Network, Power, Radio, ServerCog, ServerOff, ShieldCheck, Timer, Waypoints } from 'lucide-react';
 import { api, type Fila } from '../nucleo/api';
-import { useAlEvento, useAvisos, useDatos, useEventos } from '../nucleo/contexto';
+import { useAlEvento, useAvisos, useDatos, useEventos, useSesion } from '../nucleo/contexto';
 import { colorSemaforo, etiqueta, fechaHora, haceCuanto, numero } from '../nucleo/formato';
 import { GraficoArea } from '../componentes/Graficos';
 import { Cargando, Encabezado, Interruptor, Segmentado, Tarjeta } from '../componentes/Ui';
@@ -21,8 +21,20 @@ export default function Integraciones() {
   const { datos: d, recargar } = useDatos<Fila>('/api/integraciones');
   const [moneda, setMoneda] = useState('PEN');
   const { datos: tc } = useDatos<Fila[]>(`/api/erp/tipos-cambio/${moneda}?dias=120`);
-  useAlEvento(['MEDICION'], () => recargar());
+  const { tiene } = useSesion();
+  useAlEvento(['MEDICION', 'VALIDACION'], () => recargar());
   const sim = d?.simulador ?? {};
+  const abiertas: Fila[] = (d?.incidencias ?? []).filter((i: Fila) => !i.resuelta);
+  // Sistema restablecido: al resolver la incidencia del ERP se reanudan las validaciones pospuestas (CU17)
+  const resolver = async () => {
+    try {
+      const r = await api.post('/api/integraciones/incidencias/resolver', {});
+      avisar('exito', 'Incidencias resueltas', `${r.resueltas} incidencia(s) cerradas. Las validaciones pospuestas por el ERP vuelven a correr su plazo.`);
+      recargar();
+    } catch (e) {
+      error(e);
+    }
+  };
   const alternar = async (activo: boolean) => {
     try {
       await api.post('/api/integraciones/simulador', { activo });
@@ -55,6 +67,28 @@ export default function Integraciones() {
           );
         })}
       </div>
+
+      {abiertas.length > 0 && (
+        <Tarjeta style={{ marginBottom: 16, borderColor: 'rgba(234,179,8,.4)' }}>
+          <div className="tarjeta-cabecera">
+            <h3><ServerOff size={16} /> Incidencias de integración abiertas</h3>
+            <div className="acciones">
+              {tiene('ADMIN')
+                ? <button className="boton chico" onClick={resolver}><CircleCheck size={14} /> Sistema restablecido: resolver</button>
+                : <span className="pequeno tenue">Las resuelve el Administrador</span>}
+            </div>
+          </div>
+          <div className="columna" style={{ gap: 8 }}>
+            {abiertas.map((i) => (
+              <div key={i.id_incidencia} className="fila pequeno" style={{ gap: 10, flexWrap: 'nowrap' }}>
+                <span className="chip" style={{ color: 'var(--medio)', flexShrink: 0 }}>{i.sistema}</span>
+                <span className="crece" style={{ minWidth: 0 }}>{i.mensaje}</span>
+                <span className="tenue" style={{ flexShrink: 0 }}>{haceCuanto(i.fecha)}</span>
+              </div>
+            ))}
+          </div>
+        </Tarjeta>
+      )}
 
       <div className="rejilla r-3" style={{ marginBottom: 16 }}>
         <Tarjeta>

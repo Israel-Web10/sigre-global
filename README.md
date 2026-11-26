@@ -72,7 +72,7 @@ el equipo local.
 | `rgutierrez` | Roberto Gutiérrez | Gerente de Filial La Paz (A6) | Aprueba tratamientos de su filial; un riesgo crítico lo deriva al Director (RN04) |
 | `lparedes` | Lucía Paredes | Gerente de Filial Perú (A6) | Solo ve los datos de Perú (RN14) |
 | `admin` | Fernando Chávez | Administrador (A7) | Usuarios, roles (RN17), apetito por filial, parámetros (CU15) |
-| `lmamani` | Luis Mamani | Auditor Financiero (A8) | **Validación financiera** P02 (CU17, RN16, RN17) y **conciliación con el ERP** (CU18, RN18) |
+| `lmamani` | Luis Mamani | Auditor Financiero (A8) | **Validación financiera** P02 (CU17, RN16, RN17), posponerla si el ERP no responde y **conciliación con el ERP** (CU18, RN18) |
 
 ## 3. Guion sugerido para la defensa (10 minutos)
 
@@ -82,7 +82,7 @@ el equipo local.
 4. **Aprobación** (`rgutierrez` y luego `crojas`): el Gerente intenta aprobar un riesgo crítico → rechazo RN04 (queda en la bitácora como RECHAZADO). El Director ve la lista de verificación y aprueba: el riesgo pasa a EN_TRATAMIENTO.
 5. **Tiempo real** (`mquispe`, *Indicadores KRI*): abra un KRI del SIEM y pulse «Simular SIEM → Rojo». El trigger pone el semáforo, genera la alerta y llega al instante (campana, centro de alertas, consola de *Integraciones*).
 6. **Alertas** (`omendoza`/`jcondori`): kanban por estado con cuenta regresiva del SLA; el responsable asignado atiende → resuelve (acción correctiva) → cierra. El escalamiento es automático al vencer el SLA (sube al superior y avisa al Director); con `crojas` también está el botón «Escalar ahora».
-7. **Auditor Financiero** (`lmamani`): bandeja P02 con contraste del tipo de cambio del ERP; intentar validar RSK-FIN-0093 → RN17 (es responsable). *Conciliación ERP → Ejecutar*: Perú queda CON_DIFERENCIA (3,4 %) y Brasil CONCILIADA (1,2 %); registrar el hallazgo financiero.
+7. **Auditor Financiero** (`lmamani`): bandeja P02 con contraste del tipo de cambio del ERP; intentar validar RSK-FIN-0093 → RN17 (es responsable). **ERP no disponible (CU17)**: en el riesgo financiero que evaluó `mquispe` en el paso 3 (categoría Financiero, nivel Alto o impacto de 100 000 USD o más), pulse «Posponer: ERP no disponible»: el plazo queda en pausa y aparece la incidencia en *Integraciones*; luego «Reanudar plazo». Los riesgos de la demostración ya están fuera de plazo y por eso no muestran el botón. *Conciliación ERP → Ejecutar*: Perú queda CON_DIFERENCIA (3,4 %) y Brasil CONCILIADA (1,2 %); registrar el hallazgo financiero.
 8. **Cumplimiento** (`dflores`): evaluar una obligación con la lista de verificación; si «No cumple», nace un riesgo Legal y su alerta (RN10).
 9. **Bitácora** (`pvargas`): filtros, diferencias antes/después y **Probar que es inalterable**: el rol de la aplicación no tiene permiso y el trigger bloquea incluso al dueño del esquema (RN13).
 10. **Arquitectura** y **Vista móvil**: capas en ejecución, triggers, los 32 diagramas del informe, la PWA dentro de un teléfono; **Presentación** tiene el video y los GIF.
@@ -106,7 +106,7 @@ Sistemas externos (simulados): ERP corporativo · SIEM · servicio normativo · 
 | Carpeta | Contenido |
 |---|---|
 | `backend/src/main/java/bo/umsa/sigre/` | Paquetes del diagrama D12: `riesgos`, `monitoreo`, `auditorias`, `cumplimiento`, `reportes`, `administracion`, `seguridad`, `integraciones`, `comun` |
-| `backend/src/main/resources/db/migration/` | Flyway: `V1` esquema, `V2` funciones y triggers, `V3` roles y permisos, `V4` datos base, `V5` escenario de demostración, `V6` revocación de sesiones y roles de solo lectura (`auditor_ro`, `backup`) |
+| `backend/src/main/resources/db/migration/` | Flyway: `V1` esquema, `V2` funciones y triggers, `V3` roles y permisos, `V4` datos base, `V5` escenario de demostración, `V6` revocación de sesiones y roles de solo lectura (`auditor_ro`, `backup`), `V7` posponer la validación por ERP no disponible (CU17) |
 | `backend/src/test/` | `CasosDePruebaTest`: CP01 a CP26 de punta a punta (HTTP → servicio → trigger) y S01 a S06 de seguridad |
 | `frontend/src/` | `paginas/` (una por pantalla), `componentes/` (globo 3D, carruseles, gráficos, ventanas), `nucleo/` (API, sesión, eventos, idiomas) |
 | `frontend/public/diagramas/` | Las 32 figuras del informe (galería de *Arquitectura*) |
@@ -127,6 +127,7 @@ Sistemas externos (simulados): ERP corporativo · SIEM · servicio normativo · 
 | `trg_medicion_antes/despues` | Semáforo (RN06) y alerta automática (CU07) |
 | `trg_alerta_transicion` | Estados de la alerta (D09), SLA (RN07), acción correctiva (CU08) |
 | `chk_independencia` | El auditor no valida riesgos propios (RN17) |
+| `trg_posposicion_antes_insertar`, `trg_incidencia_resuelta` | ERP no disponible: posponer dentro del plazo, abrir la incidencia y reanudar al resolverla (CU17, RN16) |
 | `trg_conciliacion_antes/despues` | Tolerancia de la conciliación y alerta de diferencia (RN18) |
 | `trg_eval_cumplimiento_despues` | «No cumple» crea el riesgo Legal (RN10) |
 | `trg_usuario_rol_sod` | Auditor Financiero y Gestor no se combinan (RN17) |
@@ -180,17 +181,28 @@ tomaron estas decisiones, sin cambiar las reglas de negocio:
 | Docker, Prometheus y Grafana | Scripts `.bat`/PowerShell y `/actuator/health` (los detalles solo para el Administrador) |
 | Interfaz en el idioma de cada filial | El menú y los nombres de los módulos cambian entre español, inglés y portugués; el contenido de las pantallas, los datos y los reportes están en español |
 
-Pendiente conocido: el flujo alterno de CU17 «ERP no disponible → posponer la validación sin vencer el plazo de 3 días
-hábiles» no tiene botón propio; hoy el plazo sigue corriendo y la validación se registra cuando el ERP responde.
+### CU17: «ERP no disponible»
+
+El informe permite «posponer la validación sin vencer el plazo de 3 días hábiles» cuando el ERP no responde. En
+*Validación financiera*, el botón **Posponer: ERP no disponible** pide el motivo y:
+
+* deja el plazo de RN16 **en pausa**: los días hábiles que pasan mientras está pospuesta no cuentan, así que el auditor
+  conserva los días que le quedaban;
+* registra una **incidencia del ERP** (como en CU18), visible en *Integraciones*, y avisa al Gestor y al Director;
+* solo se puede pedir dentro del plazo, por un Auditor Financiero sin conflicto de funciones (RN16, RN17).
+
+El plazo se reanuda al resolver la incidencia en *Integraciones*, con el botón **Reanudar plazo** o al validar. Todo
+queda en la bitácora como `POSPONER_VALIDACION` y `REANUDAR_VALIDACION` (tabla `posposicion_validacion`, migración `V7`).
 
 ## 5. Pruebas
 
-`probar.bat` ejecuta los 26 casos del Anexo B y 6 pruebas de seguridad como pruebas de integración (JUnit 5 + MockMvc)
-contra la base `sigre_test`, que se vacía y se recrea con Flyway en cada corrida. Resultado esperado:
-`Tests run: 32, Failures: 0, Errors: 0`.
+`probar.bat` ejecuta los 26 casos del Anexo B, 6 pruebas de seguridad y la excepción «ERP no disponible» de CU17 como
+pruebas de integración (JUnit 5 + MockMvc) contra la base `sigre_test`, que se vacía y se recrea con Flyway en cada
+corrida. Resultado esperado: `Tests run: 33, Failures: 0, Errors: 0`.
 
 | Prueba | Qué comprueba |
 |---|---|
+| CP17-E | CU17 con el ERP caído: posponer abre la incidencia; tras 10 días en pausa el plazo no vence ni genera la alerta de RN16; al reanudar se conservan los 3 días |
 | S01 | Un JSON mal formado responde 400 |
 | S02 | Un gerente de filial no ve integraciones ni usuarios de otras filiales (RN14) |
 | S03 | Solo el Gestor registra riesgos y mediciones manuales (Tabla 47) |

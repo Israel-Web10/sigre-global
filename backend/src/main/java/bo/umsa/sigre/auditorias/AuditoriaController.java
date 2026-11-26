@@ -114,6 +114,22 @@ public class AuditoriaController {
                 () -> financiero.validar(u, idEvaluacion, v));
     }
 
+    @PostMapping("/api/validacion-financiera/{idEvaluacion}/posponer")
+    @Operation(summary = "CU17, excepción «ERP no disponible»: posponer la validación; el plazo de 3 días hábiles queda en pausa (RN16)")
+    public Map<String, Object> posponer(@PathVariable int idEvaluacion, @RequestBody ServicioFinanciero.Posposicion p) {
+        UsuarioSesion u = UsuarioSesion.actual();
+        return intentos.registrar(u, "POSPONER_VALIDACION", "EVALUACION_RIESGO", idEvaluacion,
+                () -> financiero.posponer(u, idEvaluacion, p));
+    }
+
+    @PostMapping("/api/validacion-financiera/{idEvaluacion}/reanudar")
+    @Operation(summary = "CU17: el ERP volvió a responder; el plazo de validación se reanuda donde quedó")
+    public Map<String, Object> reanudar(@PathVariable int idEvaluacion) {
+        UsuarioSesion u = UsuarioSesion.actual();
+        return intentos.registrar(u, "REANUDAR_VALIDACION", "EVALUACION_RIESGO", idEvaluacion,
+                () -> financiero.reanudar(u, idEvaluacion));
+    }
+
     // ------------------------------------------------------------------ CU18
 
     @GetMapping("/api/conciliacion/periodos")

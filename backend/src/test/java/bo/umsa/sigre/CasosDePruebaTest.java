@@ -569,4 +569,88 @@ class CasosDePruebaTest {
         MvcResult csv = mvc.perform(get("/api/reportes/planes.csv").header("Authorization", "Bearer " + token("crojas"))).andReturn();
         assertThat(csv.getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8)).startsWith("\uFEFF\"Riesgo\"");
     }
+
+    // ------------------------------------------------------------------ CU17, excepci\u00F3n \u00ABERP no disponible\u00BB
+
+    /** Ejecuta SQL en modo carga inicial (el mismo del escenario de demostraci\u00F3n) para simular d\u00EDas transcurridos. */
+    private void moverEnElTiempo(String sql) {
+        jdbc.execute("DO $$ BEGIN PERFORM set_config('app.carga_inicial', 'on', true); " + sql + "; END $$");
+    }
+
+    private JsonNode enBandeja(int idEvaluacion) throws Exception {
+        for (JsonNode n : get_("lmamani", "/api/validacion-financiera/pendientes").cuerpo()) {
+            if (n.get("id_evaluacion").asInt() == idEvaluacion) return n;
+        }
+        return null;
+    }
+
+    @Test
+    @Order(360)
+    @DisplayName("CP17-E \u00B7 CU17, ERP no disponible: el Auditor Financiero pospone la validaci\u00F3n y el plazo de 3 d\u00EDas h\u00E1biles no vence (RN16)")
+    void cu17ErpNoDisponible() throws Exception {
+        // El Gestor registra y eval\u00FAa un riesgo financiero ALTO: queda pendiente de validaci\u00F3n (RN16)
+        Respuesta nuevo = post_("mquispe", "/api/riesgos", Map.of("idFilial", 1, "idResponsable", idUsuario("jcondori"),
+                "titulo", "Descalce de tasas en la cartera de inversiones (prueba CU17)",
+                "descripcion", "Inversiones a tasa fija financiadas con deuda a tasa variable",
+                "categoria", "FINANCIERO", "proceso", "Tesorer\u00EDa", "causa", "Alza de las tasas de referencia",
+                "consecuencia", "P\u00E9rdida en el margen financiero"));
+        assertThat(nuevo.estado()).isEqualTo(200);
+        Respuesta ev = post_("mquispe", "/api/riesgos/" + nuevo.cuerpo().get("id_riesgo").asInt() + "/evaluaciones",
+                Map.of("tipo", "INHERENTE", "probabilidad", 3, "impacto", 4, "impactoFinanciero", 2500000, "moneda", "BOB"));
+        assertThat(ev.estado()).isEqualTo(200);
+        int eval = ev.cuerpo().get("id_evaluacion").asInt();
+        assertThat(jdbc.queryForObject("SELECT estado_validacion::text FROM evaluacion_riesgo WHERE id_evaluacion = ?", String.class, eval))
+                .isEqualTo("PENDIENTE");
+        String url = "/api/validacion-financiera/" + eval;
+        String motivo = "El ERP no devuelve el tipo de cambio BOB/USD del d\u00EDa de la evaluaci\u00F3n";
+
+        // Sin un motivo claro no se pospone, y una validaci\u00F3n que ya venci\u00F3 tampoco (RN16)
+        assertThat(post_("lmamani", url + "/posponer", Map.of("motivo", "ca\u00EDdo")).estado()).isEqualTo(422);
+        moverEnElTiempo("UPDATE evaluacion_riesgo SET fecha = fecha - 10 WHERE id_evaluacion = " + eval);
+        Respuesta tarde = post_("lmamani", url + "/posponer", Map.of("motivo", motivo));
+        assertThat(tarde.estado()).isEqualTo(422);
+        assertThat(tarde.regla()).isEqualTo("RN16");
+        moverEnElTiempo("UPDATE evaluacion_riesgo SET fecha = fecha + 10 WHERE id_evaluacion = " + eval);
+
+        // Dentro del plazo: se pospone, se registra la incidencia del ERP (como en CU18) y se avisa al Gestor
+        Respuesta p = post_("lmamani", url + "/posponer", Map.of("motivo", motivo));
+        assertThat(p.estado()).isEqualTo(200);
+        int posposicion = p.cuerpo().get("id_posposicion").asInt();
+        int incidencia = p.cuerpo().get("id_incidencia").asInt();
+        assertThat(jdbc.queryForObject("SELECT sistema || ':' || resuelta FROM incidencia_integracion WHERE id_incidencia = ?",
+                String.class, incidencia)).isEqualTo("ERP:false");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM notificacion WHERE id_usuario = ? AND titulo = 'Validaci\u00F3n financiera pospuesta'",
+                Integer.class, idUsuario("mquispe"))).isPositive();
+        assertThat(enBitacora("POSPONER_VALIDACION", "POSPOSICION_VALIDACION", posposicion, "OK")).isTrue();
+        assertThat(post_("lmamani", url + "/posponer", Map.of("motivo", motivo)).estado()).isEqualTo(422);
+
+        // Pasan 10 d\u00EDas con el ERP ca\u00EDdo: el plazo sigue en pausa, no vence ni genera la alerta de RN16
+        moverEnElTiempo("UPDATE evaluacion_riesgo SET fecha = fecha - 10 WHERE id_evaluacion = " + eval
+                + "; UPDATE posposicion_validacion SET desde = desde - interval '10 days' WHERE id_posposicion = " + posposicion);
+        JsonNode enPausa = enBandeja(eval);
+        assertThat(enPausa).isNotNull();
+        assertThat(enPausa.get("pospuesta").asBoolean()).isTrue();
+        assertThat(enPausa.get("fuera_de_plazo").asBoolean()).isFalse();
+        assertThat(enPausa.get("dias_habiles_transcurridos").asInt()).isZero();
+        String alertas = "SELECT count(*) FROM alerta WHERE id_evaluacion = ? AND tipo = 'VALIDACION_FUERA_PLAZO'";
+        int antes = jdbc.queryForObject(alertas, Integer.class, eval);
+        jdbc.queryForObject("SELECT fn_generar_alertas_programadas()", Integer.class);
+        assertThat(jdbc.queryForObject(alertas, Integer.class, eval)).isEqualTo(antes);
+
+        // El ERP vuelve: se reanuda, la incidencia queda resuelta y el auditor conserva sus 3 d\u00EDas
+        Respuesta r = post_("lmamani", url + "/reanudar", null);
+        assertThat(r.estado()).isEqualTo(200);
+        assertThat(r.cuerpo().get("fuera_de_plazo").asBoolean()).isFalse();
+        assertThat(java.time.LocalDate.parse(r.cuerpo().get("fecha_limite").asText())).isAfter(java.time.LocalDate.now());
+        assertThat(jdbc.queryForObject("SELECT resuelta FROM incidencia_integracion WHERE id_incidencia = ?", Boolean.class, incidencia)).isTrue();
+        assertThat(jdbc.queryForObject("SELECT hasta IS NOT NULL FROM posposicion_validacion WHERE id_posposicion = ?", Boolean.class, posposicion)).isTrue();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM notificacion WHERE id_usuario = ? AND titulo = 'Plazo de validaci\u00F3n reanudado'",
+                Integer.class, idUsuario("lmamani"))).isPositive();
+        assertThat(enBitacora("REANUDAR_VALIDACION", "POSPOSICION_VALIDACION", posposicion, "OK")).isTrue();
+        assertThat(post_("lmamani", url + "/reanudar", null).estado()).isEqualTo(422);
+
+        // Y la validaci\u00F3n se registra con normalidad
+        assertThat(post_("lmamani", url, Map.of("resultado", "VALIDADA", "observacion", "Contrastado con el ERP restablecido")).estado())
+                .isEqualTo(200);
+    }
 }

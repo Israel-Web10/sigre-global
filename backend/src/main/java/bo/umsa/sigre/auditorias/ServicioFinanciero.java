@@ -46,15 +46,20 @@ public class ServicioFinanciero {
                        e.tipo_cambio, e.impacto_usd, r.id_riesgo, r.codigo, r.titulo, r.categoria, r.id_responsable,
                        f.nombre AS filial, f.codigo_pais, ue.nombre_completo AS evaluador, ur.nombre_completo AS responsable,
                        e.id_evaluador,
-                       fn_sumar_dias_habiles(e.fecha, fn_param('plazo_validacion_dias_habiles')::int) AS fecha_limite,
+                       fn_plazo_validacion(e.id_evaluacion) AS fecha_limite,
                        (SELECT count(*) FROM generate_series(e.fecha + 1, CURRENT_DATE, interval '1 day') d
-                         WHERE extract(isodow FROM d) < 6) AS dias_habiles_transcurridos,
-                       (fn_sumar_dias_habiles(e.fecha, fn_param('plazo_validacion_dias_habiles')::int) < CURRENT_DATE) AS fuera_de_plazo,
+                         WHERE extract(isodow FROM d) < 6) - fn_dias_pospuestos(e.id_evaluacion) AS dias_habiles_transcurridos,
+                       (fn_plazo_validacion(e.id_evaluacion) < CURRENT_DATE) AS fuera_de_plazo,
                        fn_tipo_cambio(e.moneda, e.fecha) AS tipo_cambio_erp,
                        round(coalesce(e.impacto_financiero, 0) / nullif(fn_tipo_cambio(e.moneda, e.fecha), 0), 2) AS impacto_usd_erp,
-                       (r.id_responsable = :yo OR e.id_evaluador = :yo) AS conflicto
+                       (r.id_responsable = :yo OR e.id_evaluador = :yo) AS conflicto,
+                       -- CU17, excepción «ERP no disponible»: el plazo queda en pausa mientras está pospuesta
+                       (pp.id_posposicion IS NOT NULL) AS pospuesta, pp.desde AS pospuesta_desde, pp.motivo AS motivo_posposicion,
+                       ua.nombre_completo AS pospuesta_por, fn_dias_pospuestos(e.id_evaluacion) AS dias_en_pausa
                 FROM evaluacion_riesgo e JOIN riesgo r USING (id_riesgo) JOIN filial f ON f.id_filial = r.id_filial
                 JOIN usuario ue ON ue.id_usuario = e.id_evaluador JOIN usuario ur ON ur.id_usuario = r.id_responsable
+                LEFT JOIN posposicion_validacion pp ON pp.id_evaluacion = e.id_evaluacion AND pp.hasta IS NULL
+                LEFT JOIN usuario ua ON ua.id_usuario = pp.id_auditor_fin
                 WHERE e.estado_validacion = 'PENDIENTE'""" + c.sql() + " ORDER BY e.fecha, e.id_evaluacion",
                 c.param("yo", u.id()).params());
     }
@@ -89,9 +94,8 @@ public class ServicioFinanciero {
                 WHERE TRUE""" + c.sql() + " ORDER BY vf.fecha DESC LIMIT 200", c.params());
     }
 
-    @Transactional
-    public Map<String, Object> validar(UsuarioSesion u, int idEvaluacion, Validacion v) {
-        u.exigir("validar el impacto financiero", UsuarioSesion.AUDITOR_FINANCIERO);
+    /** Comprobaciones comunes de CU17: existe, está en el alcance del auditor (RN14), sin conflicto (RN17) y PENDIENTE. */
+    private Map<String, Object> pendienteDeValidar(UsuarioSesion u, int idEvaluacion) {
         Map<String, Object> e = bd.uno("""
                 SELECT e.estado_validacion::text AS estado_validacion, e.id_evaluador, r.id_responsable, r.id_filial, r.codigo
                 FROM evaluacion_riesgo e JOIN riesgo r USING (id_riesgo) WHERE e.id_evaluacion = :e""", p("e", idEvaluacion));
@@ -103,6 +107,61 @@ public class ServicioFinanciero {
         if (!"PENDIENTE".equals(e.get("estado_validacion"))) {
             throw new ReglaNegocioException("CU17: La evaluación no está pendiente de validación (estado " + e.get("estado_validacion") + ")");
         }
+        return e;
+    }
+
+    public record Posposicion(String motivo) { }
+
+    private Map<String, Object> plazo(int idEvaluacion) {
+        return bd.uno("""
+                SELECT fn_plazo_validacion(:e) AS fecha_limite, fn_dias_pospuestos(:e) AS dias_en_pausa,
+                       (fn_plazo_validacion(:e) < CURRENT_DATE) AS fuera_de_plazo""", p("e", idEvaluacion));
+    }
+
+    /**
+     * CU17, excepción «ERP no disponible»: pospone la validación sin que venza el plazo de 3 días hábiles.
+     * El trigger fn_posposicion_antes_insertar vuelve a comprobar RN16/RN17 y abre la incidencia del ERP.
+     */
+    @Transactional
+    public Map<String, Object> posponer(UsuarioSesion u, int idEvaluacion, Posposicion p) {
+        u.exigir("posponer la validación financiera", UsuarioSesion.AUDITOR_FINANCIERO);
+        pendienteDeValidar(u, idEvaluacion);
+        String motivo = p == null || p.motivo() == null ? "" : p.motivo().trim();
+        if (motivo.length() < 10) {
+            throw new ReglaNegocioException("CU17: Explique en al menos 10 caracteres por qué el ERP no está disponible");
+        }
+        if (motivo.length() > 300) throw new ReglaNegocioException("CU17: El motivo admite hasta 300 caracteres");
+        Map<String, Object> r = new LinkedHashMap<>(bd.uno("""
+                INSERT INTO posposicion_validacion (id_evaluacion, id_auditor_fin, motivo) VALUES (:e, :a, :m)
+                RETURNING id_posposicion, id_incidencia, desde""", p("e", idEvaluacion, "a", u.id(), "m", motivo)));
+        r.putAll(plazo(idEvaluacion));
+        return r;
+    }
+
+    /** El ERP volvió a responder: se resuelve la incidencia y el plazo sigue corriendo desde donde quedó. */
+    @Transactional
+    public Map<String, Object> reanudar(UsuarioSesion u, int idEvaluacion) {
+        u.exigir("reanudar el plazo de validación", UsuarioSesion.AUDITOR_FINANCIERO);
+        pendienteDeValidar(u, idEvaluacion);
+        Map<String, Object> pp = bd.uno("""
+                SELECT id_posposicion, id_incidencia FROM posposicion_validacion WHERE id_evaluacion = :e AND hasta IS NULL""",
+                p("e", idEvaluacion));
+        if (pp == null) throw new ReglaNegocioException("CU17: La validación no está pospuesta");
+        if (pp.get("id_incidencia") != null) {
+            bd.ejecutar("UPDATE incidencia_integracion SET resuelta = TRUE WHERE id_incidencia = :i AND NOT resuelta",
+                    p("i", pp.get("id_incidencia")));
+        }
+        bd.ejecutar("UPDATE posposicion_validacion SET hasta = now() WHERE id_posposicion = :p AND hasta IS NULL",
+                p("p", pp.get("id_posposicion")));
+        Map<String, Object> r = new LinkedHashMap<>(pp);
+        r.putAll(plazo(idEvaluacion));
+        return r;
+    }
+
+    @Transactional
+    public Map<String, Object> validar(UsuarioSesion u, int idEvaluacion, Validacion v) {
+        u.exigir("validar el impacto financiero", UsuarioSesion.AUDITOR_FINANCIERO);
+        pendienteDeValidar(u, idEvaluacion);
         EstadoValidacion resultado;
         try {
             resultado = EstadoValidacion.valueOf(v.resultado());

@@ -42,11 +42,13 @@ public class BitacoraController {
     private final String claveDueno;
     private final String usuarioApp;
     private final String claveApp;
+    private final boolean demo;
 
     public BitacoraController(Consultas bd, RegistroBitacora registro, @Value("${spring.flyway.url}") String url,
                               @Value("${spring.flyway.user}") String dueno, @Value("${spring.flyway.password}") String claveDueno,
                               @Value("${spring.datasource.username}") String usuarioApp,
-                              @Value("${spring.datasource.password}") String claveApp) {
+                              @Value("${spring.datasource.password}") String claveApp,
+                              @Value("${sigre.demo.habilitado:false}") boolean demo) {
         this.bd = bd;
         this.registro = registro;
         this.url = url;
@@ -54,6 +56,7 @@ public class BitacoraController {
         this.claveDueno = claveDueno;
         this.usuarioApp = usuarioApp;
         this.claveApp = claveApp;
+        this.demo = demo;
     }
 
     @GetMapping
@@ -69,6 +72,7 @@ public class BitacoraController {
                                          @RequestParam(defaultValue = "50") int tamano) {
         UsuarioSesion.actual().exigir("consultar la bitácora", ROLES);
         int t = Math.max(10, Math.min(tamano, 200));
+        long desplazamiento = (long) (Math.max(1, Math.min(pagina, 1_000_000)) - 1) * t;
         Condiciones c = new Condiciones()
                 .si(entidad, "b.entidad = :entidad", "entidad")
                 .si(operacion, "b.operacion = :operacion", "operacion")
@@ -78,7 +82,7 @@ public class BitacoraController {
                 .si(hasta == null ? null : hasta.plusDays(1), "b.fecha_hora < :hasta", "hasta")
                 .si(q == null ? null : "%" + q.trim().toLowerCase() + "%",
                         "(lower(b.detalle::text) LIKE :q OR lower(b.operacion) LIKE :q OR lower(coalesce(u.nombre_completo, 'sistema')) LIKE :q)", "q")
-                .param("lim", t).param("off", (Math.max(1, pagina) - 1) * t);
+                .param("lim", t).param("off", desplazamiento);
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("total", bd.valor("SELECT count(*) FROM bitacora b LEFT JOIN usuario u USING (id_usuario) WHERE TRUE" + c.sql(),
                 c.params(), Long.class));
@@ -136,12 +140,15 @@ public class BitacoraController {
         List<Map<String, Object>> capas = new ArrayList<>();
         capas.add(intentar("Permisos de la base de datos", "Rol de la aplicación (" + usuarioApp + ")", usuarioApp, claveApp,
                 "UPDATE bitacora SET operacion = 'ALTERADO' WHERE id_bitacora = " + ultimo));
-        capas.add(intentar("Trigger trg_bitacora", "Dueño del esquema (" + dueno + ")", dueno, claveDueno,
-                "UPDATE bitacora SET operacion = 'ALTERADO' WHERE id_bitacora = " + ultimo));
-        capas.add(intentar("Trigger trg_bitacora", "Dueño del esquema (" + dueno + ")", dueno, claveDueno,
-                "DELETE FROM bitacora WHERE id_bitacora = " + ultimo));
-        capas.add(intentar("Trigger trg_bitacora_truncate", "Dueño del esquema (" + dueno + ")", dueno, claveDueno,
-                "TRUNCATE bitacora"));
+        // Las pruebas con el dueño del esquema (que solo frena el trigger) existen únicamente en la demostración
+        if (demo) {
+            capas.add(intentar("Trigger trg_bitacora", "Dueño del esquema (" + dueno + ")", dueno, claveDueno,
+                    "UPDATE bitacora SET operacion = 'ALTERADO' WHERE id_bitacora = " + ultimo));
+            capas.add(intentar("Trigger trg_bitacora", "Dueño del esquema (" + dueno + ")", dueno, claveDueno,
+                    "DELETE FROM bitacora WHERE id_bitacora = " + ultimo));
+            capas.add(intentar("Trigger trg_bitacora_truncate", "Dueño del esquema (" + dueno + ")", dueno, claveDueno,
+                    "TRUNCATE bitacora"));
+        }
         boolean protegida = capas.stream().allMatch(c -> Boolean.TRUE.equals(c.get("bloqueado")));
         registro.registrar(u.id(), "PRUEBA_INALTERABILIDAD", "BITACORA", ultimo, protegida ? "RECHAZADO" : "ALERTA",
                 Map.of("intentos", capas.size(), "protegida", protegida));

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
-  AlertTriangle, Bell, CheckCheck, ChevronsLeft, ChevronsRight, Globe2, LogOut, Mail, Moon, Search, ShieldCheck, Sparkles, Sun, X,
+  AlertTriangle, Bell, CheckCheck, ChevronsLeft, ChevronsRight, Globe2, LayoutGrid, LogOut, Mail, Moon, Search, ShieldCheck, Sparkles, Sun, X,
 } from 'lucide-react';
 import { api, type Fila } from '../nucleo/api';
 import { useAlEvento, useAvisos, useEventos, usePreferencias, useSesion } from '../nucleo/contexto';
@@ -31,6 +31,7 @@ export default function Shell({ children }: { children: ReactNode }) {
   const [compacta, setCompacta] = useState(false);
   const [panel, setPanel] = useState(false);
   const [paleta, setPaleta] = useState(false);
+  const [menuMovil, setMenuMovil] = useState(false);
   const [notif, setNotif] = useState<{ no_leidas: number; notificaciones: Fila[] }>({ no_leidas: 0, notificaciones: [] });
   const [alertasAbiertas, setAlertasAbiertas] = useState(0);
   const roles = usuario?.roles ?? [];
@@ -104,7 +105,7 @@ export default function Shell({ children }: { children: ReactNode }) {
             <strong>{usuario?.nombre}</strong>
             <span>{usuario?.roles.map((r) => etiqueta(r)).join(', ')}</span>
           </div>
-          <button className="icono-btn" onClick={() => setCompacta((c) => !c)} title="Contraer menú">
+          <button className="icono-btn" onClick={() => setCompacta((c) => !c)} title="Contraer menú" aria-label={compacta ? 'Expandir menú' : 'Contraer menú'}>
             {compacta ? <ChevronsRight size={17} /> : <ChevronsLeft size={17} />}
           </button>
         </div>
@@ -116,29 +117,29 @@ export default function Shell({ children }: { children: ReactNode }) {
             <small>{usuario?.filial} · {actual?.cu ?? 'SIGRE Global'}</small>
             <strong>{actual ? t(actual.clave) : 'SIGRE Global'}</strong>
           </div>
-          <button className="buscador" onClick={() => setPaleta(true)}>
+          <button className="buscador" onClick={() => setPaleta(true)} aria-label={t('buscar')}>
             <Search size={16} />
             <span>{t('buscar')}</span>
             <kbd>Ctrl K</kbd>
           </button>
-          <span className={`en-vivo ${conectado ? '' : 'no'}`} title="Eventos en tiempo real (PostgreSQL LISTEN/NOTIFY → SSE)">
+          <span className={`en-vivo ${conectado ? '' : 'no'}`} title="Eventos en tiempo real (PostgreSQL LISTEN/NOTIFY → SSE)" role="status" aria-label={conectado ? t('enVivo') : t('desconectado')}>
             <i /> <span className="ocultar-movil">{conectado ? t('enVivo') : t('desconectado')}</span>
           </span>
-          <select className="entrada ocultar-movil" style={{ width: 70, height: 34 }} value={idioma} onChange={(e) => setIdioma(e.target.value as any)} title="Idioma">
+          <select className="entrada ocultar-movil" style={{ width: 70, height: 34 }} value={idioma} onChange={(e) => setIdioma(e.target.value as any)} title="Idioma" aria-label="Idioma">
             <option value="es">ES</option>
             <option value="en">EN</option>
             <option value="pt">PT</option>
           </select>
-          <button className="icono-btn" onClick={alternarTema} title={tema === 'oscuro' ? t('temaClaro') : t('temaOscuro')}>
+          <button className="icono-btn" onClick={alternarTema} title={tema === 'oscuro' ? t('temaClaro') : t('temaOscuro')} aria-label={tema === 'oscuro' ? t('temaClaro') : t('temaOscuro')}>
             {tema === 'oscuro' ? <Sun size={18} /> : <Moon size={18} />}
           </button>
-          <button className="icono-btn" onClick={() => setPanel(true)} title={t('notificaciones')}>
+          <button className="icono-btn" onClick={() => setPanel(true)} title={t('notificaciones')} aria-label={`${t('notificaciones')}: ${notif.no_leidas} sin leer`}>
             <motion.span key={notif.no_leidas} initial={{ rotate: -25 }} animate={{ rotate: 0 }} transition={{ type: 'spring', stiffness: 400, damping: 6 }} style={{ display: 'grid' }}>
               <Bell size={18} />
             </motion.span>
             {notif.no_leidas > 0 && <span className="punto-contador">{notif.no_leidas > 99 ? '99+' : notif.no_leidas}</span>}
           </button>
-          <button className="icono-btn" onClick={salir} title={t('cerrarSesion')}>
+          <button className="icono-btn" onClick={salir} title={t('cerrarSesion')} aria-label={t('cerrarSesion')}>
             <LogOut size={18} />
           </button>
         </header>
@@ -152,15 +153,47 @@ export default function Shell({ children }: { children: ReactNode }) {
         </main>
       </div>
 
-      <nav className="navegacion-movil">
+      <nav className="navegacion-movil" aria-label="Navegación principal">
         {items.filter((i) => i.movil).map((i) => (
-          <NavLink key={i.ruta} to={i.ruta} end={i.ruta === '/'} className={({ isActive }) => (isActive ? 'activo' : '')}>
-            <i.icono size={20} />
-            {t(i.clave).split(' ')[0]}
+          <NavLink key={i.ruta} to={i.ruta} end={i.ruta === '/'} className={({ isActive }) => (isActive ? 'activo' : '')} aria-label={t(i.clave)}>
+            <i.icono size={20} aria-hidden="true" />
+            {t(i.corta ?? i.clave).split(' ')[0]}
             {i.ruta === '/alertas' && alertasAbiertas > 0 && <span className="punto-contador" style={{ top: -2, right: 4 }}>{alertasAbiertas}</span>}
           </NavLink>
         ))}
+        <button type="button" className={menuMovil ? 'activo' : ''} onClick={() => setMenuMovil((m) => !m)} aria-expanded={menuMovil} aria-label="Más módulos">
+          <LayoutGrid size={20} aria-hidden="true" />
+          {t('mas')}
+        </button>
       </nav>
+
+      <AnimatePresence>
+        {menuMovil && (
+          <>
+            <motion.div className="velo" style={{ zIndex: 38, background: 'rgba(2,6,14,.5)' }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setMenuMovil(false)} />
+            <motion.nav className="hoja-movil" aria-label="Todos los módulos" initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 30, stiffness: 320 }}>
+              <span className="hoja-asa" aria-hidden="true" />
+              {GRUPOS.map((g) => {
+                const del = items.filter((i) => i.grupo === g);
+                if (!del.length) return null;
+                return (
+                  <div key={g}>
+                    <div className="nav-titulo">{t(g)}</div>
+                    <div className="hoja-rejilla">
+                      {del.map((i) => (
+                        <NavLink key={i.ruta} to={i.ruta} end={i.ruta === '/'} onClick={() => setMenuMovil(false)} className={({ isActive }) => (isActive ? 'activo' : '')}>
+                          <i.icono size={22} aria-hidden="true" />
+                          <span>{t(i.clave)}</span>
+                        </NavLink>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </motion.nav>
+          </>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {panel && (
@@ -173,7 +206,7 @@ export default function Shell({ children }: { children: ReactNode }) {
                   <h2>{t('notificaciones')}</h2>
                   <p>{notif.no_leidas} sin leer</p>
                 </div>
-                <button className="icono-btn" onClick={() => setPanel(false)}><X size={18} /></button>
+                <button className="icono-btn" onClick={() => setPanel(false)} aria-label="Cerrar notificaciones"><X size={18} /></button>
               </div>
               <div className="fila" style={{ padding: '10px 16px', borderBottom: '1px solid var(--borde)' }}>
                 <button className="boton chico" onClick={() => api.post('/api/notificaciones/leidas').then(cargarNotif)}>

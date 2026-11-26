@@ -44,6 +44,10 @@ if (-not (Test-Path $seg)) {
 sigre.jwt.secreto=$(Clave 64)
 # Duracion de la sesion en minutos
 sigre.jwt.minutos=480
+# Modo demostracion: acceso rapido por rol y simulador del ERP y el SIEM (desactivelo en produccion)
+sigre.demo.habilitado=true
+# Clave de todos los usuarios de demostracion (se aplica al crear la base de datos)
+sigre.demo.clave-usuarios=Demo-$(Clave 10)
 "@ | Set-Content -Encoding ascii $seg
     Write-Host '[CONFIG] Se creó config\seguridad.properties con una clave JWT nueva' -ForegroundColor Green
 }

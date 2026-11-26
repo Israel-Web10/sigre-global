@@ -55,10 +55,10 @@ export default function Cumplimiento() {
       {pestana === 'obligaciones' && (
         <>
           <div className="fila" style={{ marginBottom: 12 }}>
-            <select className="entrada" style={{ width: 320 }} value={normativa ?? ''} onChange={(e) => setNormativa(e.target.value ? Number(e.target.value) : null)}>
+            <select className="entrada" style={{ width: 320, maxWidth: '100%' }} aria-label="Filtrar por normativa" value={normativa ?? ''} onChange={(e) => setNormativa(e.target.value ? Number(e.target.value) : null)}>
               <option value="">Todas las normativas</option>{(normativas ?? []).map((n) => <option key={n.id_normativa} value={n.id_normativa}>{n.jurisdiccion} · {n.nombre}</option>)}
             </select>
-            <select className="entrada" style={{ width: 170 }} value={estado} onChange={(e) => setEstado(e.target.value)}>
+            <select className="entrada" style={{ width: 170 }} aria-label="Filtrar por estado" value={estado} onChange={(e) => setEstado(e.target.value)}>
               <option value="">Todo estado</option>{['PENDIENTE', 'CUMPLE', 'PARCIAL', 'NO_CUMPLE'].map((s) => <option key={s} value={s}>{etiqueta(s)}</option>)}
             </select>
           </div>

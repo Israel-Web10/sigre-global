@@ -99,7 +99,7 @@ public class ServicioAuditorias {
 
     @Transactional
     public Map<String, Object> planificar(UsuarioSesion u, NuevaAuditoria n) {
-        u.exigir("planificar auditorías", UsuarioSesion.AUDITOR_INTERNO, UsuarioSesion.DIRECTOR);
+        u.exigir("planificar auditorías", UsuarioSesion.AUDITOR_INTERNO);
         if (n.idFilial() == null || n.idAuditor() == null || n.tipo() == null) {
             throw new ReglaNegocioException("CU10: Indique filial, auditor y tipo de auditoría");
         }
@@ -203,6 +203,7 @@ public class ServicioAuditorias {
         if (!responsable && !u.tieneAlguno(UsuarioSesion.AUDITOR_INTERNO, UsuarioSesion.AUDITOR_FINANCIERO)) {
             throw ReglaNegocioException.prohibido("CU11: Solo el responsable o el auditor actualizan el hallazgo");
         }
+        if (c.estado() == null) throw new ReglaNegocioException("CU11: Indique el nuevo estado del hallazgo");
         if ("CERRADO".equals(c.estado()) && !u.tieneAlguno(UsuarioSesion.AUDITOR_INTERNO, UsuarioSesion.AUDITOR_FINANCIERO)) {
             throw ReglaNegocioException.prohibido("CU11: El cierre del hallazgo lo verifica el auditor");
         }

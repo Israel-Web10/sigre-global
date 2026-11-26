@@ -5,10 +5,10 @@
   instalación del equipo. Escucha solo en localhost, en el puerto de config\bd.properties.
 
   Uso:  powershell -ExecutionPolicy Bypass -File scripts\bd.ps1 -Accion iniciar
-        Acciones: iniciar | detener | estado | reiniciar-datos | consola
+        Acciones: iniciar | detener | estado | reiniciar-datos | consola | respaldar
 #>
 param(
-    [ValidateSet('iniciar', 'detener', 'estado', 'reiniciar-datos', 'consola')]
+    [ValidateSet('iniciar', 'detener', 'estado', 'reiniciar-datos', 'consola', 'respaldar')]
     [string]$Accion = 'iniciar'
 )
 
@@ -121,6 +121,20 @@ switch ($Accion) {
         $Evidencias = Join-Path $env:LOCALAPPDATA 'SIGRE-Global\evidencias'
         if (Test-Path $Evidencias) { Remove-Item -Recurse -Force $Evidencias }
         Iniciar
+    }
+    'respaldar' {
+        # RNF12: respaldo completo en formato personalizado de pg_dump (se restaura con pg_restore)
+        Iniciar
+        $Carpeta = Join-Path $env:LOCALAPPDATA 'SIGRE-Global\respaldos'
+        New-Item -ItemType Directory -Force $Carpeta | Out-Null
+        $Archivo = Join-Path $Carpeta ("sigre_" + (Get-Date -Format 'yyyyMMdd_HHmmss') + '.dump')
+        $env:PGPASSWORD = $Cfg['sigre.bd.owner-clave']
+        & (Join-Path $BinDir 'pg_dump.exe') -h localhost -p $Puerto -U $Cfg['sigre.bd.owner'] -Fc -f $Archivo $Cfg['sigre.bd.nombre']
+        if ($LASTEXITCODE -ne 0) { throw 'No se pudo generar el respaldo' }
+        # Conserva los 14 respaldos más recientes
+        Get-ChildItem $Carpeta -Filter 'sigre_*.dump' | Sort-Object LastWriteTime -Descending | Select-Object -Skip 14 | Remove-Item -Force
+        Escribir "Respaldo creado: $Archivo ($([math]::Round((Get-Item $Archivo).Length / 1KB)) KB)" 'Green'
+        Escribir "Para restaurar: pg_restore -h localhost -p $Puerto -U $($Cfg['sigre.bd.owner']) -d sigre --clean `"$Archivo`""
     }
     'consola' {
         Iniciar

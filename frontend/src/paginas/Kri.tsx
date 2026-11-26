@@ -37,7 +37,7 @@ export default function Kri() {
           { valor: 'AMARILLO', texto: <><i style={{ width: 8, height: 8, borderRadius: 4, background: 'var(--medio)', display: 'inline-block' }} /> {conteo.AMARILLO}</> },
           { valor: 'VERDE', texto: <><i style={{ width: 8, height: 8, borderRadius: 4, background: 'var(--bajo)', display: 'inline-block' }} /> {conteo.VERDE}</> },
         ]} />
-        <select className="entrada" style={{ width: 150 }} value={fuente} onChange={(e) => setFuente(e.target.value)}>
+        <select className="entrada" style={{ minWidth: 150, maxWidth: '100%' }} aria-label="Filtrar por fuente" value={fuente} onChange={(e) => setFuente(e.target.value)}>
           <option value="">Todas las fuentes</option><option value="ERP">ERP</option><option value="SIEM">SIEM</option><option value="MANUAL">Manual</option>
         </select>
       </Encabezado>
@@ -70,7 +70,7 @@ export default function Kri() {
           ))}
         </div>
       )}
-      {elegido && <DetalleKri k={elegido} cerrar={() => setElegido(null)} recargar={recargar} puedeAdministrar={tiene('GESTOR', 'DIRECTOR', 'ADMIN')}
+      {elegido && <DetalleKri k={elegido} cerrar={() => setElegido(null)} recargar={recargar} puedeAdministrar={tiene('GESTOR', 'ADMIN')}
         alVentana={() => { abrir({ id: `kri-${elegido.id_kri}`, titulo: elegido.nombre, icono: <Gauge size={15} />, contenido: <GraficoKri id={elegido.id_kri} />, ancho: 640, alto: 420 }); setElegido(null); }} />}
     </>
   );
@@ -122,7 +122,7 @@ function DetalleKri({ k, cerrar, recargar, puedeAdministrar, alVentana }: { k: F
               { nombre: 'Umbral amarillo', color: '#eab308', datos: d.mediciones.map(() => Number(k.umbral_amarillo)) },
             ]} />
           <div className="rejilla r-3">
-            {tiene('RESPONSABLE', 'GESTOR', 'GERENTE_FILIAL') && (
+            {tiene('GESTOR') && (
               <div className="tarjeta" style={{ padding: 14 }}>
                 <h3 style={{ marginBottom: 10 }}><PlusCircle size={15} /> Medición manual (CU06)</h3>
                 <div className="fila" style={{ flexWrap: 'nowrap' }}>

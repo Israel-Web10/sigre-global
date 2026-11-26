@@ -75,13 +75,13 @@ export default function Bitacora() {
       <Tarjeta style={{ padding: 12, marginBottom: 12 }}>
         <div className="fila">
           <div className="con-icono crece" style={{ minWidth: 220 }}><Search size={16} /><input className="entrada" placeholder="Buscar en el detalle, la operación o el usuario" value={f.q ?? ''} onChange={(e) => cambiar('q', e.target.value)} /></div>
-          <select className="entrada" style={{ width: 200 }} value={f.operacion ?? ''} onChange={(e) => cambiar('operacion', e.target.value)}>
+          <select className="entrada" style={{ width: 200 }} aria-label="Filtrar por operación" value={f.operacion ?? ''} onChange={(e) => cambiar('operacion', e.target.value)}>
             <option value="">Todas las operaciones</option>{(res?.operaciones ?? []).map((o: string) => <option key={o} value={o}>{operacion(o)}</option>)}
           </select>
-          <select className="entrada" style={{ width: 180 }} value={f.entidad ?? ''} onChange={(e) => cambiar('entidad', e.target.value)}>
+          <select className="entrada" style={{ width: 180 }} aria-label="Filtrar por entidad" value={f.entidad ?? ''} onChange={(e) => cambiar('entidad', e.target.value)}>
             <option value="">Todas las entidades</option>{(res?.entidades ?? []).map((o: string) => <option key={o}>{o}</option>)}
           </select>
-          <select className="entrada" style={{ width: 140 }} value={f.resultado ?? ''} onChange={(e) => cambiar('resultado', e.target.value)}>
+          <select className="entrada" style={{ width: 140 }} aria-label="Filtrar por resultado" value={f.resultado ?? ''} onChange={(e) => cambiar('resultado', e.target.value)}>
             <option value="">Todo resultado</option><option value="OK">Correcto</option><option value="RECHAZADO">Rechazado</option><option value="FALLIDO">Fallido</option>
           </select>
           <input className="entrada" type="date" style={{ width: 150 }} value={f.desde ?? ''} onChange={(e) => cambiar('desde', e.target.value)} title="Desde" />

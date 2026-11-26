@@ -37,10 +37,11 @@ export default function Login() {
     [info]
   );
 
-  const entrar = async (u: string, c: string, quien = 'form') => {
+  const entrar = async (u: string, c: string | null, quien = 'form') => {
     setEnviando(quien);
     try {
-      const r = await api.post('/api/auth/login', { login: u, clave: c });
+      // El acceso rápido de la demostración lo resuelve el servidor (la clave no viaja al navegador)
+      const r = c === null ? await api.post('/api/auth/demo', { login: u }) : await api.post('/api/auth/login', { login: u, clave: c });
       if (r.requiere2fa) {
         setDesafio(r.desafio);
         avisar('info', 'Doble factor', 'Ingrese el código de su aplicación autenticadora');
@@ -164,7 +165,7 @@ export default function Login() {
               </div>
               <div className="usuarios-demo">
                 {demo.usuarios.map((u: Fila, i: number) => (
-                  <motion.button key={u.login} className="usuario-demo" onClick={() => entrar(u.login, demo.clave, u.login)} disabled={!!enviando}
+                  <motion.button key={u.login} className="usuario-demo" onClick={() => entrar(u.login, null, u.login)} disabled={!!enviando}
                     initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 + i * 0.04 }}>
                     {enviando === u.login ? <span className="avatar"><Girando /></span> : <Avatar nombre={u.nombre} />}
                     <div>

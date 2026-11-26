@@ -169,7 +169,7 @@ public class ServicioCumplimiento {
         u.exigirFilial(filial);
         String ruta = almacen.guardar(archivo, "cumplimiento/" + idEvalCump);
         Evidencia ev = Evidencia.deCumplimiento(idEvalCump, u.id(), AlmacenEvidencias.limpiarNombre(archivo.getOriginalFilename()),
-                archivo.getContentType(), archivo.getSize(), descripcion);
+                AlmacenEvidencias.tipoMime(archivo.getOriginalFilename()), archivo.getSize(), descripcion);
         ev.ubicar(ruta);
         dominio.guardar(ev);
         return Map.of("id_evidencia", ev.getId());

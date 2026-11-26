@@ -36,7 +36,7 @@ export default function Conciliacion() {
     <>
       <Encabezado icono={<GitCompareArrows size={22} />} titulo="Conciliación con el ERP (CU18)"
         texto={`Compara el valor de cada KRI financiero del sistema con el cierre contable del ERP. Si la diferencia supera la tolerancia de ${numero(tol)} % queda CON_DIFERENCIA, se genera una alerta y se registra el hallazgo financiero (RN18).`}>
-        <select className="entrada" style={{ width: 140 }} value={per} onChange={(e) => setPeriodo(e.target.value)}>
+        <select className="entrada" style={{ width: 140 }} aria-label="Período" value={per} onChange={(e) => setPeriodo(e.target.value)}>
           {(periodos ?? []).map((p) => <option key={p}>{p}</option>)}
         </select>
         {tiene('AUDITOR_FINANCIERO') && <button className="boton primario" disabled={ejecutando} onClick={ejecutar}>{ejecutando ? <Girando /> : <PlayCircle size={16} />} Ejecutar conciliación</button>}

@@ -3,13 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   Activity, AlertOctagon, AppWindow, BadgeDollarSign, Bell, BookOpenCheck, Flame, Gauge, Globe2, LayoutDashboard, RefreshCw,
-  ShieldAlert, TrendingUp, Zap,
+  ShieldAlert, TrendingUp, Zap, CalendarClock, FileDown, FileSpreadsheet,
 } from 'lucide-react';
-import { conParametros, type Fila } from '../nucleo/api';
-import { useAlEvento, useDatos, useEventos, useSesion } from '../nucleo/contexto';
-import { banderaHtml, colorNivel, colorSemaforo, colorValor, etiqueta, haceCuanto, nivelDe, numero, operacion, usd } from '../nucleo/formato';
+import { conParametros, descargar, type Fila } from '../nucleo/api';
+import { useAlEvento, useAvisos, useDatos, useEventos, useSesion } from '../nucleo/contexto';
+import { banderaHtml, colorValorSolido, colorNivel, colorSemaforo, colorSeveridad, colorValor, etiqueta, fecha, haceCuanto, nivelDe, numero, operacion, usd } from '../nucleo/formato';
 import { Barras, Dona, GraficoArea, MapaCalor, Sparkline } from '../componentes/Graficos';
-import { Bandera, Cargando, ChipEstado, ChipNivel, Kpi, Segmentado, Tarjeta, Vacio } from '../componentes/Ui';
+import { Bandera, Cargando, ChipEstado, ChipNivel, ChipSeveridad, Kpi, RelojSla, Segmentado, Tarjeta, Vacio } from '../componentes/Ui';
 import { useVentanas } from '../componentes/Ventanas';
 
 const Globo = lazy(() => import('../componentes/Globo'));
@@ -18,13 +18,29 @@ const CATEGORIAS = ['', 'FINANCIERO', 'TECNOLOGICO', 'LEGAL', 'OPERATIVO', 'REPU
 const COLOR_CAT: Record<string, string> = { FINANCIERO: '#22d3ee', TECNOLOGICO: '#6366f1', LEGAL: '#a855f7', OPERATIVO: '#f97316', REPUTACIONAL: '#ec4899' };
 
 export default function Tablero() {
-  const { usuario } = useSesion();
+  const { usuario, tiene } = useSesion();
   const { ultimos } = useEventos();
   const { abrir } = useVentanas();
   const ir = useNavigate();
   const [filial, setFilial] = useState<string>('');
   const [categoria, setCategoria] = useState('');
-  const { datos: d, cargando, recargar } = useDatos<Fila>(conParametros('/api/tablero', { filial, categoria }));
+  const [region, setRegion] = useState('');
+  const [dias, setDias] = useState('30');
+  const [exportando, setExportando] = useState<string | null>(null);
+  const { error: avisoError, avisar } = useAvisos();
+  const { datos: d, cargando, recargar } = useDatos<Fila>(conParametros('/api/tablero', { filial, categoria, region, dias }));
+  // P01: exportar el registro de riesgos y el reporte financiero desde el tablero (RF18, RF24)
+  const exportar = async (clave: string, formato: 'pdf' | 'xlsx') => {
+    setExportando(`${clave}.${formato}`);
+    try {
+      await descargar(conParametros(`/api/reportes/${clave}.${formato}`, { filial }), `SIGRE_${clave}_${new Date().toISOString().slice(0, 10)}.${formato}`);
+      avisar('exito', 'Reporte exportado', `${clave === 'riesgos' ? 'Registro de riesgos' : 'Reporte financiero'} en ${formato.toUpperCase()}`);
+    } catch (e) {
+      avisoError(e);
+    } finally {
+      setExportando(null);
+    }
+  };
   const espera = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useAlEvento(['MEDICION', 'ALERTA_GENERADA', 'ALERTA_ACTUALIZADA', 'EVALUACION', 'PLAN', 'VALIDACION', 'CUMPLIMIENTO'], () => {
     clearTimeout(espera.current);
@@ -61,18 +77,32 @@ export default function Tablero() {
         </div>
         <div className="acciones">
           {usuario?.corporativo && (
-            <select className="entrada" style={{ width: 210 }} value={filial} onChange={(e) => setFilial(e.target.value)}>
+            <select className="entrada" style={{ width: 210 }} aria-label="Filtrar por filial" value={filial} onChange={(e) => setFilial(e.target.value)}>
               <option value="">Todas las filiales</option>
               {(d?.por_filial ?? []).map((f: Fila) => <option key={f.id_filial} value={f.id_filial}>{f.nombre}</option>)}
             </select>
           )}
+          {usuario?.corporativo && (
+            <select className="entrada" style={{ width: 150 }} aria-label="Filtrar por región" value={region} onChange={(e) => setRegion(e.target.value)}>
+              <option value="">Todas las regiones</option>
+              {(d?.regiones ?? []).map((r: string) => <option key={r} value={r}>{r}</option>)}
+            </select>
+          )}
+          <button className="boton" disabled={!!exportando} onClick={() => exportar('riesgos', 'pdf')}><FileDown size={16} /> PDF</button>
+          <button className="boton" disabled={!!exportando} onClick={() => exportar('riesgos', 'xlsx')}><FileSpreadsheet size={16} /> Excel</button>
+          {tiene('DIRECTOR', 'AUDITOR_FINANCIERO', 'AUDITOR_INTERNO', 'GESTOR') && (
+            <button className="boton" disabled={!!exportando} onClick={() => exportar('financiero', 'pdf')} title="Reporte financiero de riesgos (RF24)"><BadgeDollarSign size={16} /> Financiero</button>
+          )}
           <button className="boton" onClick={abrirMapa}><AppWindow size={16} /> Mapa en ventana</button>
-          <button className="boton" onClick={recargar}><RefreshCw size={16} className={cargando ? 'girando' : ''} /></button>
+          <button className="boton" onClick={recargar} aria-label="Actualizar el tablero" title="Actualizar"><RefreshCw size={16} className={cargando ? 'girando' : ''} /></button>
         </div>
       </motion.div>
 
       <div className="fila entre">
-        <Segmentado valor={categoria} cambiar={setCategoria} opciones={CATEGORIAS.map((c) => ({ valor: c, texto: c ? etiqueta(c) : 'Todas' }))} />
+        <div className="fila" style={{ gap: 8 }}>
+          <Segmentado valor={categoria} cambiar={setCategoria} opciones={CATEGORIAS.map((c) => ({ valor: c, texto: c ? etiqueta(c) : 'Todas' }))} />
+          <Segmentado valor={dias} cambiar={setDias} opciones={[{ valor: '7', texto: '7 d' }, { valor: '30', texto: '30 d' }, { valor: '90', texto: '90 d' }, { valor: '365', texto: '1 año' }]} />
+        </div>
         <div className="ticker crece ocultar-movil" style={{ maxWidth: 760 }}>
           <span className="ticker-item" style={{ color: 'var(--acento)' }}><Zap size={13} /> Flujo en vivo</span>
           <AnimatePresence initial={false}>
@@ -127,7 +157,7 @@ export default function Tablero() {
                         <div style={{ fontWeight: 600, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.nombre}</div>
                         <div className="pequeno tenue">{f.riesgos} riesgos · {f.alertas} alertas · apetito {f.apetito_riesgo}</div>
                       </div>
-                      {f.valor_maximo ? <span className="chip solido" style={{ background: colorValor(f.valor_maximo) }}>{f.valor_maximo}</span> : <span className="chip">—</span>}
+                      {f.valor_maximo ? <span className="chip solido" style={{ background: colorValorSolido(f.valor_maximo) }}>{f.valor_maximo}</span> : <span className="chip">—</span>}
                     </motion.div>
                   ))}
                 </div>
@@ -150,7 +180,7 @@ export default function Tablero() {
           <div className="rejilla r-3">
             <Tarjeta className="span-2" retraso={0.05}>
               <div className="tarjeta-cabecera">
-                <h2><TrendingUp size={18} /> Alertas de los últimos 30 días</h2>
+                <h2><TrendingUp size={18} /> Alertas de los últimos {d.periodo_dias ?? dias} días</h2>
                 <div className="acciones"><span className="chip" style={{ color: 'var(--bajo)' }}>{numero(k.sla_cumplido_pct ?? 0, 1)} % atendidas en plazo (RN07)</span></div>
               </div>
               <GraficoArea
@@ -252,6 +282,41 @@ export default function Tablero() {
                   </div>
                 ))}
               </div>
+            </Tarjeta>
+          </div>
+          <div className="rejilla r-2">
+            <Tarjeta retraso={0.05}>
+              <div className="tarjeta-cabecera"><h2><Bell size={18} /> Alertas abiertas</h2><div className="acciones"><button className="boton chico" onClick={() => ir('/alertas')}>Centro de alertas</button></div></div>
+              {(d.alertas_abiertas ?? []).length === 0 ? <Vacio texto="No hay alertas abiertas" /> : (
+                <div className="columna" style={{ gap: 8 }}>
+                  {(d.alertas_abiertas ?? []).map((a: Fila) => (
+                    <div key={a.id_alerta} className="tarjeta-alerta" style={{ ['--color' as any]: colorSeveridad(a.severidad) }} onClick={() => ir(`/alertas?id=${a.id_alerta}`)}
+                      role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && ir(`/alertas?id=${a.id_alerta}`)}>
+                      <div className="fila entre"><ChipSeveridad s={a.severidad} /><RelojSla segundos={a.segundos_restantes} /></div>
+                      <p style={{ WebkitLineClamp: 2 }}>{a.mensaje}</p>
+                      <div className="pequeno tenue">{a.asignado} · {etiqueta(a.estado)}{a.nivel_escalamiento > 0 ? ` · escalada nivel ${a.nivel_escalamiento}` : ''}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Tarjeta>
+            <Tarjeta retraso={0.1}>
+              <div className="tarjeta-cabecera"><h2><CalendarClock size={18} /> Obligaciones que vencen en 30 días</h2><div className="acciones"><span className="pequeno tenue">RN09</span></div></div>
+              {(d.obligaciones_por_vencer ?? []).length === 0 ? <Vacio texto="Ninguna obligación vence en los próximos 30 días" /> : (
+                <div className="columna" style={{ gap: 10 }}>
+                  {(d.obligaciones_por_vencer ?? []).map((o: Fila) => (
+                    <div key={o.id_obligacion} className="fila" style={{ gap: 10, flexWrap: 'nowrap', cursor: 'pointer' }} onClick={() => ir('/cumplimiento')}>
+                      <span className="chip" style={{ color: Number(o.dias) < 0 ? 'var(--critico)' : Number(o.dias) <= 7 ? 'var(--alto)' : 'var(--medio)', minWidth: 64, justifyContent: 'center' }}>
+                        {Number(o.dias) < 0 ? `-${-o.dias} d` : `${o.dias} d`}
+                      </span>
+                      <div className="crece" style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{o.descripcion}</div>
+                        <div className="pequeno tenue"><Bandera codigo={o.codigo_pais} /> {o.filial} · {o.organismo} · {fecha(o.fecha_vencimiento)}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </Tarjeta>
           </div>
           <div className="pequeno tenue centrado">Nivel promedio del portafolio: {numero(k.nivel_promedio, 1)} ({etiqueta(nivelDe(Number(k.nivel_promedio ?? 0)))}) · {k.planes_por_aprobar} planes por aprobar · {k.evaluaciones_vencidas} evaluaciones vencidas (RN03)</div>

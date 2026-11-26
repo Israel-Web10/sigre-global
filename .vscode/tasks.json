@@ -1,0 +1,68 @@
+{
+  "version": "2.0.0",
+  // Todas las tareas corren en Windows PowerShell; las rutas usan "/" porque en JSON "\" inicia un escape.
+  "options": {
+    "shell": { "executable": "powershell.exe", "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command"] }
+  },
+  "tasks": [
+    {
+      "label": "1. Base de datos: iniciar",
+      "detail": "Levanta el PostgreSQL del proyecto en el puerto 5434 (crea config/ la primera vez)",
+      "type": "shell",
+      "command": "./scripts/bd.ps1 -Accion iniciar",
+      "problemMatcher": []
+    },
+    {
+      "label": "Base de datos: detener",
+      "type": "shell",
+      "command": "./scripts/bd.ps1 -Accion detener",
+      "problemMatcher": []
+    },
+    {
+      "label": "Base de datos: respaldar",
+      "detail": "Copia completa con pg_dump en %LOCALAPPDATA%/SIGRE-Global/respaldos (guarda las 14 últimas)",
+      "type": "shell",
+      "command": "./scripts/bd.ps1 -Accion respaldar",
+      "problemMatcher": []
+    },
+    {
+      "label": "Base de datos: reiniciar datos de demostración",
+      "detail": "Borra la base sigre; al iniciar la API, Flyway la vuelve a crear con el escenario de demostración",
+      "type": "shell",
+      "command": "./scripts/bd.ps1 -Accion reiniciar-datos",
+      "problemMatcher": []
+    },
+    {
+      "label": "Liberar el puerto 8090",
+      "detail": "Cierra la API si quedó abierta con iniciar.bat",
+      "type": "shell",
+      "command": "Get-NetTCPConnection -LocalPort 8090 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }",
+      "problemMatcher": []
+    },
+    {
+      "label": "3. Web: modo desarrollo (Vite)",
+      "detail": "http://localhost:5173 con recarga instantánea; las llamadas a /api van a la API del puerto 8090",
+      "type": "shell",
+      "command": "npm install --no-audit --no-fund; npm run dev",
+      "options": { "cwd": "${workspaceFolder}/frontend" },
+      "isBackground": true,
+      "problemMatcher": { "pattern": { "regexp": "^x" }, "background": { "activesBegin": true, "beginsPattern": "VITE", "endsPattern": "Local:" } }
+    },
+    {
+      "label": "Pruebas CP01–CP26",
+      "detail": "Pruebas de integración (CP01–CP26 y S01–S06) sobre la base sigre_test",
+      "type": "shell",
+      "command": "../herramientas/apache-maven-3.9.16/bin/mvn.cmd -B test",
+      "options": { "cwd": "${workspaceFolder}/backend" },
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "Compilar todo (jar con la web)",
+      "type": "shell",
+      "command": "./compilar.bat",
+      "group": "build",
+      "problemMatcher": []
+    }
+  ]
+}

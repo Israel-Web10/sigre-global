@@ -30,7 +30,7 @@ export default function Riesgos() {
   const [estado, setEstado] = useState('');
   const [nivel, setNivel] = useState(params.get('nivel') ?? '');
   const [filial, setFilial] = useState('');
-  const [vista, setVista] = useState<'tabla' | 'tarjetas'>('tabla');
+  const [vista, setVista] = useState<'tabla' | 'tarjetas'>(() => (window.matchMedia('(max-width: 767px)').matches ? 'tarjetas' : 'tabla'));
   const [nuevo, setNuevo] = useState(false);
   const pCelda = params.get('p');
   const iCelda = params.get('i');
@@ -51,23 +51,23 @@ export default function Riesgos() {
       <Encabezado icono={<ShieldAlert size={22} />} titulo="Catálogo de riesgos"
         texto={`${filas.length} riesgos ${usuario?.corporativo ? 'de todas las filiales' : `de ${usuario?.filial}`} (RN14). Cada registro, evaluación y cambio de estado queda en la bitácora.`}>
         <Segmentado valor={vista} cambiar={setVista} opciones={[{ valor: 'tabla', texto: <><Table2 size={14} /> Tabla</> }, { valor: 'tarjetas', texto: <><LayoutGrid size={14} /> Tarjetas</> }]} />
-        {tiene('GESTOR', 'GERENTE_FILIAL', 'DIRECTOR') && <button className="boton primario" onClick={() => setNuevo(true)}><Plus size={16} /> Registrar riesgo</button>}
+        {tiene('GESTOR') && <button className="boton primario" onClick={() => setNuevo(true)}><Plus size={16} /> Registrar riesgo</button>}
       </Encabezado>
 
       <Tarjeta style={{ padding: 12, marginBottom: 16 }}>
-        <div className="fila" style={{ gap: 10 }}>
-          <div className="con-icono crece" style={{ minWidth: 220 }}><Search size={16} /><input className="entrada" placeholder="Buscar por código, título, proceso o responsable" value={q} onChange={(e) => setQ(e.target.value)} /></div>
-          <select className="entrada" style={{ width: 160 }} value={categoria} onChange={(e) => setCategoria(e.target.value)}>
+        <div className="fila filtros" style={{ gap: 10 }}>
+          <div className="con-icono crece" style={{ minWidth: 220 }}><Search size={16} /><input className="entrada" placeholder="Buscar por código, título, proceso o responsable" aria-label="Buscar riesgos" value={q} onChange={(e) => setQ(e.target.value)} /></div>
+          <select className="entrada" style={{ width: 160 }} aria-label="Filtrar por categoría" value={categoria} onChange={(e) => setCategoria(e.target.value)}>
             <option value="">Todas las categorías</option>{CATEGORIAS.map((c) => <option key={c.c} value={c.c}>{etiqueta(c.c)}</option>)}
           </select>
-          <select className="entrada" style={{ width: 160 }} value={estado} onChange={(e) => setEstado(e.target.value)}>
+          <select className="entrada" style={{ width: 160 }} aria-label="Filtrar por estado" value={estado} onChange={(e) => setEstado(e.target.value)}>
             <option value="">Todos los estados</option>{['IDENTIFICADO', 'EVALUADO', 'EN_TRATAMIENTO', 'MITIGADO', 'ACEPTADO', 'CERRADO'].map((c) => <option key={c} value={c}>{etiqueta(c)}</option>)}
           </select>
-          <select className="entrada" style={{ width: 140 }} value={nivel} onChange={(e) => setNivel(e.target.value)}>
+          <select className="entrada" style={{ width: 140 }} aria-label="Filtrar por nivel" value={nivel} onChange={(e) => setNivel(e.target.value)}>
             <option value="">Todos los niveles</option>{['CRITICO', 'ALTO', 'MEDIO', 'BAJO'].map((c) => <option key={c} value={c}>{etiqueta(c)}</option>)}
           </select>
           {usuario?.corporativo && (
-            <select className="entrada" style={{ width: 190 }} value={filial} onChange={(e) => setFilial(e.target.value)}>
+            <select className="entrada" style={{ width: 190 }} aria-label="Filtrar por filial" value={filial} onChange={(e) => setFilial(e.target.value)}>
               <option value="">Todas las filiales</option>{(cat?.filiales ?? []).map((f: Fila) => <option key={f.id_filial} value={f.id_filial}>{f.nombre}</option>)}
             </select>
           )}
@@ -77,7 +77,7 @@ export default function Riesgos() {
 
       {cargando && !datos ? <Cargando filas={8} /> : vista === 'tabla' ? (
         <Tarjeta style={{ padding: 0 }}>
-          <Tabla filas={filas} clave={(r) => r.id_riesgo} alClic={(r) => ir(`/riesgos/${r.id_riesgo}`)} vacio="No hay riesgos con esos filtros"
+          <Tabla etiqueta="Catálogo de riesgos" filas={filas} clave={(r) => r.id_riesgo} alClic={(r) => ir(`/riesgos/${r.id_riesgo}`)} vacio="No hay riesgos con esos filtros"
             columnas={[
               { clave: 'codigo', titulo: 'Código', render: (r) => <span className="codigo">{r.codigo}</span> },
               { clave: 'titulo', titulo: 'Riesgo', render: (r) => <div style={{ maxWidth: 330 }}><div style={{ fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.titulo}</div><div className="pequeno tenue">{etiqueta(r.categoria)} · {r.proceso}</div></div> },

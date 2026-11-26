@@ -80,7 +80,7 @@ public class ServicioKri {
     /** CU06: registrar una medición manual; el trigger asigna el semáforo y genera la alerta (CU07). */
     @Transactional
     public Map<String, Object> registrarMedicion(UsuarioSesion u, int idKri, BigDecimal valor) {
-        u.exigir("registrar mediciones", UsuarioSesion.RESPONSABLE, UsuarioSesion.GESTOR, UsuarioSesion.GERENTE);
+        u.exigir("registrar mediciones", UsuarioSesion.GESTOR);
         kri(u, idKri);
         if (valor == null) throw new ReglaNegocioException("CU06: Indique el valor medido");
         IndicadorKri k = dominio.buscar(IndicadorKri.class, idKri, "El indicador");
@@ -97,7 +97,7 @@ public class ServicioKri {
 
     @Transactional
     public Map<String, Object> definir(UsuarioSesion u, NuevoKri n) {
-        u.exigir("definir indicadores", UsuarioSesion.GESTOR, UsuarioSesion.DIRECTOR);
+        u.exigir("definir indicadores", UsuarioSesion.GESTOR);
         Riesgo r = dominio.buscar(Riesgo.class, n.idRiesgo(), "El riesgo");
         u.exigirFilial(r.getIdFilial());
         if (n.nombre() == null || n.nombre().isBlank()) throw new ReglaNegocioException("CU06: Indique el nombre del indicador");
@@ -110,7 +110,7 @@ public class ServicioKri {
     /** CP19: modificar los umbrales queda en la bitácora como MODIFICAR_UMBRAL. */
     @Transactional
     public Map<String, Object> cambiarUmbrales(UsuarioSesion u, int idKri, Umbrales n) {
-        u.exigir("modificar umbrales", UsuarioSesion.GESTOR, UsuarioSesion.DIRECTOR, UsuarioSesion.ADMIN);
+        u.exigir("modificar umbrales", UsuarioSesion.GESTOR, UsuarioSesion.ADMIN);
         kri(u, idKri);
         IndicadorKri k = dominio.buscar(IndicadorKri.class, idKri, "El indicador");
         k.cambiarUmbrales(n.umbralAmarillo(), n.umbralRojo());
@@ -120,7 +120,7 @@ public class ServicioKri {
 
     @Transactional
     public Map<String, Object> activar(UsuarioSesion u, int idKri, boolean activo) {
-        u.exigir("activar indicadores", UsuarioSesion.GESTOR, UsuarioSesion.DIRECTOR);
+        u.exigir("activar indicadores", UsuarioSesion.GESTOR, UsuarioSesion.ADMIN);
         kri(u, idKri);
         IndicadorKri k = dominio.buscar(IndicadorKri.class, idKri, "El indicador");
         k.activar(activo);

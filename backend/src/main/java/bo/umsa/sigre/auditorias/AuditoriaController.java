@@ -47,6 +47,8 @@ public class AuditoriaController {
     @GetMapping("/api/auditorias/auditores")
     @Operation(summary = "CU10: auditores con su disponibilidad")
     public List<Map<String, Object>> auditores(@RequestParam(required = false) LocalDate inicio, @RequestParam(required = false) LocalDate fin) {
+        UsuarioSesion.actual().exigir("consultar la agenda de los auditores", UsuarioSesion.AUDITOR_INTERNO, UsuarioSesion.AUDITOR_FINANCIERO,
+                UsuarioSesion.DIRECTOR);
         return auditorias.auditores(inicio, fin);
     }
 

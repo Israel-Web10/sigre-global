@@ -34,11 +34,13 @@ public class AdminController {
     private final Consultas bd;
     private final PasswordEncoder claves;
     private final Intentos intentos;
+    private final bo.umsa.sigre.seguridad.ValidadorSesiones sesiones;
 
-    public AdminController(Consultas bd, PasswordEncoder claves, Intentos intentos) {
+    public AdminController(Consultas bd, PasswordEncoder claves, Intentos intentos, bo.umsa.sigre.seguridad.ValidadorSesiones sesiones) {
         this.bd = bd;
         this.claves = claves;
         this.intentos = intentos;
+        this.sesiones = sesiones;
     }
 
     public record DatosUsuario(String nombreCompleto, String login, String email, String cargo, Integer idFilial, Integer idSuperior,
@@ -115,6 +117,12 @@ public class AdminController {
         return intentos.registrar(u, "MODIFICAR_USUARIO", "USUARIO", id, () -> {
             if (id == u.id() && Boolean.FALSE.equals(d.activo())) throw new ReglaNegocioException("CU15: No puede desactivar su propia cuenta");
             if (d.idSuperior() != null && d.idSuperior() == id) throw new ReglaNegocioException("CU15: Un usuario no puede ser su propio superior");
+            if (id == u.id() && d.roles() != null && !d.roles().contains(UsuarioSesion.ADMIN)) {
+                throw new ReglaNegocioException("CU15: No puede quitarse a sí mismo el rol de Administrador");
+            }
+            Map<String, Object> antes = bd.uno("SELECT activo, id_filial FROM usuario WHERE id_usuario = :id", p("id", id));
+            if (antes == null) throw ReglaNegocioException.noEncontrado("El usuario");
+            List<String> rolesAntes = bd.jdbc().queryForList("SELECT r.codigo FROM usuario_rol ur JOIN rol r USING (id_rol) WHERE ur.id_usuario = :u ORDER BY 1", p("u", id), String.class);
             bd.ejecutar("""
                     UPDATE usuario SET nombre_completo = coalesce(:n, nombre_completo), email = coalesce(:e, email),
                            cargo = coalesce(:c, cargo), id_filial = coalesce(:f, id_filial), id_superior = :s,
@@ -123,7 +131,12 @@ public class AdminController {
                     p("n", d.nombreCompleto(), "e", d.email(), "c", d.cargo(), "f", d.idFilial(), "s", d.idSuperior(),
                             "i", d.idioma(), "a", d.activo(), "id", id));
             if (d.roles() != null) asignarRoles(id, new TreeSet<>(d.roles()));
-            return Map.of("id_usuario", id);
+            boolean cambioRoles = d.roles() != null && !new TreeSet<>(d.roles()).equals(new TreeSet<>(rolesAntes));
+            boolean desactivado = Boolean.FALSE.equals(d.activo());
+            boolean cambioFilial = d.idFilial() != null && !d.idFilial().equals(antes.get("id_filial"));
+            // Las sesiones abiertas del usuario dejan de valer si cambian sus permisos
+            if (cambioRoles || desactivado || cambioFilial) sesiones.revocar(id);
+            return Map.of("id_usuario", id, "sesiones_revocadas", cambioRoles || desactivado || cambioFilial);
         });
     }
 
@@ -152,8 +165,10 @@ public class AdminController {
     public Map<String, Object> restablecer(@PathVariable int id, @RequestBody Clave c) {
         UsuarioSesion u = admin();
         validarClave(c.clave());
-        bd.ejecutar("UPDATE usuario SET clave_hash = :h, totp_activo = FALSE, totp_secreto = NULL WHERE id_usuario = :id",
+        int n = bd.ejecutar("UPDATE usuario SET clave_hash = :h, totp_activo = false, totp_secreto = NULL, totp_pendiente = NULL WHERE id_usuario = :id",
                 p("h", claves.encode(c.clave()), "id", id));
+        if (n == 0) throw ReglaNegocioException.noEncontrado("El usuario");
+        sesiones.revocar(id);
         return Map.of("id_usuario", id, "restablecida", true, "por", u.login());
     }
 
@@ -204,6 +219,7 @@ public class AdminController {
         return intentos.registrar(u, "MODIFICAR_PARAMETRO", "PARAMETRO", null, () -> {
             Map<String, Object> actual = bd.uno("SELECT * FROM parametro WHERE clave = :c", p("c", clave));
             if (actual == null) throw ReglaNegocioException.noEncontrado("El parámetro");
+            if (v == null || v.valor() == null || v.valor().isBlank()) throw new ReglaNegocioException("CU15: Indique el valor del parámetro");
             if ("NUMERO".equals(actual.get("tipo"))) {
                 BigDecimal n;
                 try {

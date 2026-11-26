@@ -1,5 +1,6 @@
 import { lazy, Suspense, type ReactNode } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { MotionConfig } from 'framer-motion';
 import Shell from './componentes/Shell';
 import { Cargando } from './componentes/Ui';
 import { ProveedorVentanas } from './componentes/Ventanas';
@@ -68,6 +69,7 @@ function Rutas() {
 
 export default function App() {
   return (
+    <MotionConfig reducedMotion="user">
     <ProveedorPreferencias>
       <ProveedorSesion>
         <ProveedorAvisos>
@@ -81,5 +83,6 @@ export default function App() {
         </ProveedorAvisos>
       </ProveedorSesion>
     </ProveedorPreferencias>
+    </MotionConfig>
   );
 }

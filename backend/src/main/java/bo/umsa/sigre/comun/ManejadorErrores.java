@@ -1,6 +1,8 @@
 package bo.umsa.sigre.comun;
 
+import java.io.IOException;
 import java.sql.SQLException;
+import java.time.format.DateTimeParseException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -10,6 +12,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -61,11 +69,33 @@ public class ManejadorErrores {
         return respuesta(HttpStatus.NOT_FOUND, "Recurso no encontrado", "No encontrado");
     }
 
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<Map<String, Object>> cuerpoIlegible(HttpMessageNotReadableException e) {
+        return respuesta(HttpStatus.BAD_REQUEST, "El cuerpo de la petición no es un JSON válido o tiene valores de tipo incorrecto", "Validación");
+    }
+
+    @ExceptionHandler({MethodArgumentTypeMismatchException.class, DateTimeParseException.class})
+    public ResponseEntity<Map<String, Object>> tipoInvalido(Exception e) {
+        String campo = e instanceof MethodArgumentTypeMismatchException m ? " «" + m.getName() + "»" : "";
+        return respuesta(HttpStatus.BAD_REQUEST, "Valor inválido en el parámetro" + campo, "Validación");
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<Map<String, Object>> tipoContenido(HttpMediaTypeNotSupportedException e) {
+        return respuesta(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Tipo de contenido no admitido: use application/json", "Validación");
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<Map<String, Object>> metodo(HttpRequestMethodNotSupportedException e) {
+        return respuesta(HttpStatus.METHOD_NOT_ALLOWED, "Método HTTP no permitido en esta ruta", "Validación");
+    }
+
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<Map<String, Object>> general(Exception e) {
-        // El navegador cerró la conexión (por ejemplo, el flujo de eventos SSE): no es un error del sistema
-        if (e instanceof java.io.IOException || e.getCause() instanceof java.io.IOException
-                || e instanceof org.springframework.web.context.request.async.AsyncRequestNotUsableException) {
+    public ResponseEntity<Map<String, Object>> general(Exception e, HttpServletRequest req) {
+        // El navegador cerró el flujo de eventos (SSE): no es un error del sistema ni hay a quién responder
+        boolean flujo = "/api/eventos".equals(req.getRequestURI())
+                || String.valueOf(req.getHeader("Accept")).contains("text/event-stream");
+        if (e instanceof AsyncRequestNotUsableException || (flujo && (e instanceof IOException || e.getCause() instanceof IOException))) {
             return null;
         }
         PSQLException pg = buscarPsql(e);
@@ -73,8 +103,9 @@ public class ManejadorErrores {
         if (e instanceof IllegalArgumentException) {
             return respuesta(HttpStatus.BAD_REQUEST, e.getMessage(), "Validación");
         }
-        log.error("Error no controlado", e);
-        return respuesta(HttpStatus.INTERNAL_SERVER_ERROR, "Error interno: " + e.getMessage(), "Error");
+        String referencia = Long.toString(System.nanoTime() % 1_000_000_000L, 36).toUpperCase();
+        log.error("Error no controlado [{}] en {} {}", referencia, req.getMethod(), req.getRequestURI(), e);
+        return respuesta(HttpStatus.INTERNAL_SERVER_ERROR, "Error interno del servidor (referencia " + referencia + ")", "Error");
     }
 
     /** Mensaje de la base de datos según el código SQLSTATE. */

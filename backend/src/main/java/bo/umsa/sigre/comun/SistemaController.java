@@ -69,7 +69,8 @@ public class SistemaController {
                 SELECT u.id_usuario, u.nombre_completo, u.cargo, u.id_filial, f.codigo AS filial_codigo, f.codigo_pais,
                        array_agg(r.codigo ORDER BY r.codigo) AS roles, bool_or(r.corporativo) AS corporativo
                 FROM usuario u JOIN filial f USING (id_filial) JOIN usuario_rol ur USING (id_usuario) JOIN rol r USING (id_rol)
-                WHERE u.activo GROUP BY u.id_usuario, f.codigo, f.codigo_pais ORDER BY u.nombre_completo"""));
+                WHERE u.activo AND (:corp OR u.id_filial = :f OR r.corporativo)
+                GROUP BY u.id_usuario, f.codigo, f.codigo_pais ORDER BY u.nombre_completo""", Consultas.p("corp", u.corporativo(), "f", u.idFilial())));
         m.put("categorias", List.of("FINANCIERO", "TECNOLOGICO", "LEGAL", "OPERATIVO", "REPUTACIONAL"));
         m.put("monedas", bd.jdbc().queryForList("SELECT DISTINCT moneda FROM filial UNION SELECT 'USD' ORDER BY 1", Map.of(), String.class));
         m.put("parametros", bd.lista("SELECT clave, valor, descripcion, regla FROM parametro ORDER BY clave"));

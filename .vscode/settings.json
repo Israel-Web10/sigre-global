@@ -1,0 +1,8 @@
+{
+  "maven.executable.path": "${workspaceFolder}/herramientas/apache-maven-3.9.16/bin/mvn.cmd",
+  "java.configuration.updateBuildConfiguration": "automatic",
+  "java.compile.nullAnalysis.mode": "disabled",
+  "files.encoding": "utf8",
+  "files.exclude": { "**/node_modules": true, "**/target": true, "frontend/dist": true },
+  "search.exclude": { "herramientas": true, "frontend/public/medios": true }
+}

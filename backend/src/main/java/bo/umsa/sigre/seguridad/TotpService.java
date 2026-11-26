@@ -32,6 +32,16 @@ public class TotpService {
         return "otpauth://totp/" + etiqueta + "?secret=" + secreto + "&issuer=SIGRE%20Global&algorithm=SHA1&digits=6&period=30";
     }
 
+    /** Paso de 30 s que coincide con el código (±1 paso de tolerancia) o null si no coincide. */
+    public Long pasoVerificado(String secreto, String codigo) {
+        if (secreto == null || codigo == null || !codigo.matches("[0-9]{6}")) return null;
+        long paso = Instant.now().getEpochSecond() / 30;
+        for (int d = -1; d <= 1; d++) {
+            if (codigo(secreto, paso + d).equals(codigo)) return paso + d;
+        }
+        return null;
+    }
+
     /** Acepta el código del intervalo actual y de los intervalos vecinos (tolerancia de reloj). */
     public boolean verificar(String secreto, String codigo) {
         if (secreto == null || codigo == null || !codigo.matches("\\d{6}")) return false;

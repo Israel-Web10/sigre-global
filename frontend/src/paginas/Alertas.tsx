@@ -36,7 +36,7 @@ export default function Alertas() {
       <Encabezado icono={<Siren size={22} />} titulo="Centro de alertas (CU07 a CU09)"
         texto="Cada alerta nace de un trigger, la entrega el servicio de notificaciones y tiene un plazo según su severidad: crítica 24 h, advertencia 72 h, preventiva 168 h (RN07). Si nadie la atiende a tiempo, se escala al superior.">
         <Segmentado valor={mias} cambiar={setMias} opciones={[{ valor: 'todas', texto: 'Todas' }, { valor: 'mias', texto: <><UserRound size={14} /> Asignadas a mí</> }]} />
-        <select className="entrada" style={{ width: 150 }} value={severidad} onChange={(e) => setSeveridad(e.target.value)}>
+        <select className="entrada" style={{ minWidth: 150, maxWidth: '100%' }} aria-label="Filtrar por severidad" value={severidad} onChange={(e) => setSeveridad(e.target.value)}>
           <option value="">Toda severidad</option><option value="CRITICA">Crítica</option><option value="ADVERTENCIA">Advertencia</option><option value="PREVENTIVA">Preventiva</option>
         </select>
       </Encabezado>
@@ -47,10 +47,10 @@ export default function Alertas() {
         <Kpi titulo="Atendidas en plazo" valor={res?.atendidas ? (100 * Number(res.en_plazo)) / Number(res.atendidas) : 0} decimales={1} sufijo=" %" icono={<CheckCheck size={18} />} color="var(--bajo)" retraso={0.15} pie={<>{res?.en_plazo ?? 0} de {res?.atendidas ?? 0}</>} />
       </div>
       {!datos ? <Cargando filas={3} alto={200} /> : (
-        <div className="kanban">
+        <div className="kanban" tabIndex={0} role="region" aria-label="Tablero de alertas por estado">
           {grupos.map((g) => (
             <div key={g.t} className="kanban-columna">
-              <h3><i style={{ width: 9, height: 9, borderRadius: 5, background: g.c, display: 'inline-block' }} /> {g.t} <span className="contador" style={{ marginLeft: 'auto' }}>{g.lista.length}</span></h3>
+              <h2><i style={{ width: 9, height: 9, borderRadius: 5, background: g.c, display: 'inline-block' }} aria-hidden="true" /> {g.t} <span className="contador" style={{ marginLeft: 'auto' }}>{g.lista.length}</span></h2>
               <AnimatePresence initial={false}>
                 {g.lista.slice(0, 40).map((a) => (
                   <motion.div layout key={a.id_alerta} layoutId={`al-${a.id_alerta}`} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}

@@ -1,0 +1,29 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "java",
+      "name": "2. API SIGRE (Spring Boot)",
+      "request": "launch",
+      "mainClass": "bo.umsa.sigre.SigreApplication",
+      "projectName": "sigre-global",
+      "cwd": "${workspaceFolder}",
+      "vmArgs": "-Dfile.encoding=UTF-8",
+      "preLaunchTask": "1. Base de datos: iniciar"
+    },
+    {
+      "type": "node-terminal",
+      "name": "3. Web React (Vite)",
+      "request": "launch",
+      "command": "npm run dev",
+      "cwd": "${workspaceFolder}/frontend"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Sistema completo (base + API + web)",
+      "configurations": ["2. API SIGRE (Spring Boot)", "3. Web React (Vite)"],
+      "stopAll": true
+    }
+  ]
+}

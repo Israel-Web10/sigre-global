@@ -45,8 +45,17 @@ public class ServicioNotificaciones {
                 n++;
             } catch (RuntimeException e) {
                 log.warn("No se pudo notificar la alerta {}: {}", id, e.getMessage());
-                bd.ejecutar("INSERT INTO incidencia_integracion (sistema, operacion, mensaje) VALUES ('NOTIFICACIONES', 'ENTREGAR_ALERTA', :m)",
-                        p("m", "Alerta " + id + ": " + e.getMessage()));
+                try {
+                    String m = "Alerta " + id + ": " + e.getMessage();
+                    bd.ejecutar("""
+                            INSERT INTO incidencia_integracion (sistema, operacion, mensaje)
+                            SELECT 'NOTIFICACIONES', 'ENTREGAR_ALERTA', :m
+                            WHERE NOT EXISTS (SELECT 1 FROM incidencia_integracion
+                                              WHERE NOT resuelta AND sistema = 'NOTIFICACIONES' AND mensaje = :m)""",
+                            p("m", m.substring(0, Math.min(390, m.length()))));
+                } catch (RuntimeException ignorada) {
+                    log.debug("No se pudo registrar la incidencia: {}", ignorada.getMessage());
+                }
             }
         }
         return n;

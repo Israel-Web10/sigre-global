@@ -14,7 +14,11 @@ multimedia/_temporal/
 
 # Editores y sistema operativo
 .idea/
-.vscode/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
+!.vscode/settings.json
 *.iml
 .DS_Store
 Thumbs.db

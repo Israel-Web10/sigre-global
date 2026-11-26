@@ -62,7 +62,8 @@ management:
         include: health,info
   endpoint:
     health:
-      show-details: always
+      show-details: when-authorized
+      roles: ADMIN
 
 springdoc:
   api-docs:
@@ -74,11 +75,12 @@ springdoc:
 
 sigre:
   zona-horaria: America/La_Paz
-  # Modo demostración: muestra los usuarios de prueba en el inicio de sesión
-  # y habilita el simulador de integraciones (ERP y SIEM).
+  # Modo demostración: acceso rápido por rol, simulador del ERP y el SIEM, y prueba de la bitácora
+  # con el dueño del esquema. Está apagado por defecto: lo activa config/seguridad.properties
+  # (sigre.demo.habilitado=true), que genera scripts/configurar.ps1 en cada equipo junto con la
+  # clave de los usuarios de demostración (sigre.demo.clave-usuarios).
   demo:
-    habilitado: true
-    clave-usuarios: Sigre#2026
+    habilitado: false
   evidencias:
     carpeta: ${user.home}/AppData/Local/SIGRE-Global/evidencias
   tareas:

@@ -42,6 +42,8 @@ const T: Record<string, [string, string, string]> = {
   temaClaro: ['Tema claro', 'Light theme', 'Tema claro'],
   temaOscuro: ['Tema oscuro', 'Dark theme', 'Tema escuro'],
   ventanas: ['Ventanas', 'Windows', 'Janelas'],
+  misAccionesCorto: ['Acciones', 'Actions', 'Ações'],
+  mas: ['Más', 'More', 'Mais'],
   abrirVentana: ['Abrir en ventana', 'Open in window', 'Abrir em janela'],
 };
 

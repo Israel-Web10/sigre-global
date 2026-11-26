@@ -39,6 +39,47 @@ public class AlmacenEvidencias {
         return n.isBlank() ? "archivo" : n;
     }
 
+    private static final java.util.Map<String, String> TIPOS = java.util.Map.ofEntries(
+            java.util.Map.entry("pdf", "application/pdf"), java.util.Map.entry("png", "image/png"),
+            java.util.Map.entry("jpg", "image/jpeg"), java.util.Map.entry("jpeg", "image/jpeg"),
+            java.util.Map.entry("webp", "image/webp"), java.util.Map.entry("gif", "image/gif"),
+            java.util.Map.entry("docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+            java.util.Map.entry("xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+            java.util.Map.entry("pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation"),
+            java.util.Map.entry("txt", "text/plain"), java.util.Map.entry("csv", "text/csv"),
+            java.util.Map.entry("zip", "application/zip"), java.util.Map.entry("mp4", "video/mp4"));
+
+    /** Tipos que el navegador puede mostrar sin riesgo de ejecutar código. */
+    private static final Set<String> SEGUROS_EN_LINEA = Set.of("pdf", "png", "jpg", "jpeg", "webp", "gif", "mp4");
+
+    /** Tipo MIME según la extensión validada (nunca el que declara el navegador que sube el archivo). */
+    public static String tipoMime(String nombre) {
+        return TIPOS.getOrDefault(extension(nombre), "application/octet-stream");
+    }
+
+    public static boolean seguroEnLinea(String nombre) {
+        return SEGUROS_EN_LINEA.contains(extension(nombre));
+    }
+
+    /** Comprueba la firma del archivo (primeros bytes) según su extensión. */
+    static boolean firmaValida(String ext, byte[] b) {
+        java.util.function.BiPredicate<Integer, int[]> empieza = (desde, firma) -> {
+            if (b.length < desde + firma.length) return false;
+            for (int i = 0; i < firma.length; i++) if ((b[desde + i] & 0xFF) != firma[i]) return false;
+            return true;
+        };
+        return switch (ext) {
+            case "pdf" -> empieza.test(0, new int[]{0x25, 0x50, 0x44, 0x46});
+            case "png" -> empieza.test(0, new int[]{0x89, 0x50, 0x4E, 0x47});
+            case "jpg", "jpeg" -> empieza.test(0, new int[]{0xFF, 0xD8, 0xFF});
+            case "gif" -> empieza.test(0, new int[]{0x47, 0x49, 0x46, 0x38});
+            case "webp" -> empieza.test(0, new int[]{0x52, 0x49, 0x46, 0x46}) && empieza.test(8, new int[]{0x57, 0x45, 0x42, 0x50});
+            case "docx", "xlsx", "pptx", "zip" -> empieza.test(0, new int[]{0x50, 0x4B});
+            case "mp4" -> empieza.test(4, new int[]{0x66, 0x74, 0x79, 0x70});
+            default -> true; // txt y csv: texto plano, se sirven siempre como descarga
+        };
+    }
+
     public static String extension(String nombre) {
         int i = nombre.lastIndexOf('.');
         return i < 0 ? "" : nombre.substring(i + 1).toLowerCase(Locale.ROOT);
@@ -52,6 +93,10 @@ public class AlmacenEvidencias {
             throw new ReglaNegocioException("RNF02: Tipo de archivo no permitido (" + extension(nombre) + "). Use PDF, imagen u Office");
         }
         try (InputStream in = archivo.getInputStream()) {
+            byte[] inicio = archivo.getInputStream().readNBytes(16);
+            if (!firmaValida(extension(nombre), inicio)) {
+                throw new ReglaNegocioException("RNF02: El contenido del archivo no corresponde a su extensión (" + extension(nombre) + ")");
+            }
             return guardar(in, subcarpeta, nombre);
         } catch (IOException e) {
             throw new IllegalStateException("No se pudo guardar la evidencia", e);

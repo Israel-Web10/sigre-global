@@ -126,9 +126,17 @@ public class ServicioFinanciero {
     }
 
     /** Estado de la conciliación de un período: valor del sistema, cierre del ERP y resultado. */
+    private static YearMonth periodo(String texto) {
+        try {
+            return texto == null || texto.isBlank() ? YearMonth.now().minusMonths(1) : YearMonth.parse(texto.trim());
+        } catch (java.time.format.DateTimeParseException e) {
+            throw new ReglaNegocioException("CU18: Período inválido; use el formato AAAA-MM", org.springframework.http.HttpStatus.BAD_REQUEST);
+        }
+    }
+
     public Map<String, Object> conciliacion(UsuarioSesion u, String periodo, Integer filial) {
-        String per = periodo == null || periodo.isBlank() ? YearMonth.now().minusMonths(1).toString() : periodo;
-        YearMonth ym = YearMonth.parse(per);
+        YearMonth ym = periodo(periodo);
+        String per = ym.toString();
         Condiciones c = new Condiciones().alcance(u, "r.id_filial").si(filial, "r.id_filial = :filial", "filial")
                 .param("per", per).param("ini", ym.atDay(1)).param("fin", ym.plusMonths(1).atDay(1))
                 .param("tol", bd.valor("SELECT fn_param('tolerancia_conciliacion_pct')", Map.of(), BigDecimal.class));
@@ -154,7 +162,7 @@ public class ServicioFinanciero {
     @Transactional
     public Map<String, Object> ejecutar(UsuarioSesion u, String periodo, Integer filial) {
         u.exigir("conciliar con el ERP", UsuarioSesion.AUDITOR_FINANCIERO);
-        String per = periodo == null || periodo.isBlank() ? YearMonth.now().minusMonths(1).toString() : periodo;
+        String per = periodo(periodo).toString();
         if (YearMonth.parse(per).isAfter(YearMonth.now().minusMonths(1))) {
             throw new ReglaNegocioException("CU18: Solo se concilian períodos cerrados (hasta " + YearMonth.now().minusMonths(1) + ")");
         }

@@ -235,6 +235,7 @@ export default function Globo({
     host.addEventListener('pointerup', arriba);
     host.addEventListener('pointerleave', arriba);
 
+    const quieto = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const reloj = new THREE.Clock();
     let cuadro = 0;
     const vec = new THREE.Vector3();
@@ -244,7 +245,7 @@ export default function Globo({
       const dt = reloj.getDelta();
       const t = reloj.elapsedTime;
       if (!arrastrando) {
-        if (girar) globo.rotation.y += dt * 0.06;
+        if (girar && !quieto) globo.rotation.y += dt * 0.06;
         globo.rotation.y += velocidad.x;
         velocidad.x *= 0.92;
       }

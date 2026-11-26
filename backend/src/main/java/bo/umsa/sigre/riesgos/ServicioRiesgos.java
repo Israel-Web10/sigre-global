@@ -137,16 +137,16 @@ public class ServicioRiesgos {
         String estado = (String) r.get("estado");
         String estadoPlan = (String) r.get("estado_plan");
         Map<String, Object> m = new LinkedHashMap<>();
-        m.put("editar", u.tieneAlguno(UsuarioSesion.GESTOR, UsuarioSesion.GERENTE) && !"CERRADO".equals(estado));
-        m.put("evaluar", u.tieneAlguno(UsuarioSesion.GESTOR, UsuarioSesion.DIRECTOR)
+        m.put("editar", u.tiene(UsuarioSesion.GESTOR) && !"CERRADO".equals(estado));
+        m.put("evaluar", u.tiene(UsuarioSesion.GESTOR)
                 && List.of("IDENTIFICADO", "EVALUADO", "MITIGADO").contains(estado));
-        m.put("evaluarResidual", u.tieneAlguno(UsuarioSesion.GESTOR, UsuarioSesion.DIRECTOR)
+        m.put("evaluarResidual", u.tiene(UsuarioSesion.GESTOR)
                 && List.of("EN_TRATAMIENTO", "MITIGADO").contains(estado));
-        m.put("definirPlan", u.tieneAlguno(UsuarioSesion.GESTOR, UsuarioSesion.RESPONSABLE, UsuarioSesion.GERENTE)
+        m.put("definirPlan", u.tiene(UsuarioSesion.GESTOR)
                 && "EVALUADO".equals(estado) && (estadoPlan == null || "BORRADOR".equals(estadoPlan)));
         m.put("aprobar", u.tieneAlguno(UsuarioSesion.DIRECTOR, UsuarioSesion.GERENTE) && "PROPUESTO".equals(estadoPlan));
         m.put("cerrar", u.tieneAlguno(UsuarioSesion.GESTOR, UsuarioSesion.DIRECTOR) && List.of("MITIGADO", "ACEPTADO").contains(estado));
-        m.put("definirKri", u.tieneAlguno(UsuarioSesion.GESTOR, UsuarioSesion.DIRECTOR) && !"CERRADO".equals(estado));
+        m.put("definirKri", u.tiene(UsuarioSesion.GESTOR) && !"CERRADO".equals(estado));
         return m;
     }
 
@@ -174,7 +174,7 @@ public class ServicioRiesgos {
 
     @Transactional
     public Map<String, Object> registrar(UsuarioSesion u, NuevoRiesgo n) {
-        u.exigir("registrar riesgos", UsuarioSesion.GESTOR, UsuarioSesion.GERENTE, UsuarioSesion.DIRECTOR);
+        u.exigir("registrar riesgos", UsuarioSesion.GESTOR);
         Integer filial = n.idFilial() == null ? u.idFilial() : n.idFilial();
         u.exigirFilial(filial);
         validarTexto(n.titulo(), 5, "el título");
@@ -196,7 +196,7 @@ public class ServicioRiesgos {
 
     @Transactional
     public Map<String, Object> actualizar(UsuarioSesion u, int id, NuevoRiesgo n) {
-        u.exigir("modificar riesgos", UsuarioSesion.GESTOR, UsuarioSesion.GERENTE);
+        u.exigir("modificar riesgos", UsuarioSesion.GESTOR);
         Riesgo r = dominio.buscar(Riesgo.class, id, "El riesgo");
         u.exigirFilial(r.getIdFilial());
         validarTexto(n.titulo(), 5, "el título");
@@ -224,10 +224,12 @@ public class ServicioRiesgos {
         if (probabilidad < 1 || probabilidad > 5 || impacto < 1 || impacto > 5) {
             throw new ReglaNegocioException("RN02: La probabilidad y el impacto van de 1 a 5");
         }
+        if (impactoFinanciero != null && impactoFinanciero.signum() < 0) throw new ReglaNegocioException("RN15: El impacto financiero no puede ser negativo");
         int valor = probabilidad * impacto;
         NivelRiesgo nivel = NivelRiesgo.desde(valor);
         String mon = moneda == null || moneda.isBlank() ? (String) r.get("moneda_filial") : moneda.toUpperCase();
         BigDecimal tc = bd.valor("SELECT fn_tipo_cambio(:m, CURRENT_DATE)", p("m", mon), BigDecimal.class);
+        if (tc == null) throw new ReglaNegocioException("RN15: El ERP no publica tipo de cambio para la moneda " + mon);
         BigDecimal usd = impactoFinanciero == null || tc == null ? null : impactoFinanciero.divide(tc, 2, RoundingMode.HALF_UP);
         BigDecimal umbral = bd.valor("SELECT fn_param('umbral_validacion_usd')", Map.of(), BigDecimal.class);
         CategoriaRiesgo cat = CategoriaRiesgo.valueOf((String) r.get("categoria"));
@@ -254,7 +256,7 @@ public class ServicioRiesgos {
 
     @Transactional
     public Map<String, Object> evaluar(UsuarioSesion u, int idRiesgo, NuevaEvaluacion n) {
-        u.exigir("evaluar riesgos", UsuarioSesion.GESTOR, UsuarioSesion.DIRECTOR);
+        u.exigir("evaluar riesgos", UsuarioSesion.GESTOR);
         Riesgo r = dominio.buscar(Riesgo.class, idRiesgo, "El riesgo");
         u.exigirFilial(r.getIdFilial());
         if (n.probabilidad() == null || n.impacto() == null || n.probabilidad() < 1 || n.probabilidad() > 5
@@ -262,6 +264,7 @@ public class ServicioRiesgos {
             throw new ReglaNegocioException("RN02: La probabilidad y el impacto van de 1 a 5");
         }
         TipoEvaluacion tipo = n.tipo() == null ? TipoEvaluacion.INHERENTE : n.tipo();
+        if (n.impactoFinanciero() != null && n.impactoFinanciero().signum() < 0) throw new ReglaNegocioException("RN15: El impacto financiero no puede ser negativo");
         if (r.getCategoria() == CategoriaRiesgo.FINANCIERO && tipo == TipoEvaluacion.INHERENTE && n.impactoFinanciero() == null) {
             throw new ReglaNegocioException("RN15: Un riesgo financiero debe estimar su impacto en moneda local");
         }
@@ -284,7 +287,7 @@ public class ServicioRiesgos {
 
     @Transactional
     public Map<String, Object> agregarControl(UsuarioSesion u, int idRiesgo, NuevoControl n) {
-        u.exigir("registrar controles", UsuarioSesion.GESTOR, UsuarioSesion.RESPONSABLE, UsuarioSesion.DIRECTOR);
+        u.exigir("registrar controles", UsuarioSesion.GESTOR);
         Riesgo r = dominio.buscar(Riesgo.class, idRiesgo, "El riesgo");
         u.exigirFilial(r.getIdFilial());
         if (n.descripcion() == null || n.descripcion().isBlank()) throw new ReglaNegocioException("CU02: Describa el control");
@@ -294,7 +297,7 @@ public class ServicioRiesgos {
 
     @Transactional
     public void eliminarControl(UsuarioSesion u, int idRiesgo, int idControl) {
-        u.exigir("eliminar controles", UsuarioSesion.GESTOR, UsuarioSesion.DIRECTOR);
+        u.exigir("eliminar controles", UsuarioSesion.GESTOR);
         Control c = dominio.buscar(Control.class, idControl, "El control");
         Riesgo r = dominio.buscar(Riesgo.class, idRiesgo, "El riesgo");
         if (!c.getIdRiesgo().equals(idRiesgo)) throw ReglaNegocioException.noEncontrado("El control");

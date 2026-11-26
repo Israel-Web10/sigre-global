@@ -28,7 +28,7 @@ export default function Auditorias() {
     <>
       <Encabezado icono={<ClipboardCheck size={22} />} titulo={`Plan anual de auditorías ${anio}`}
         texto="Planificación con control de disponibilidad del auditor (CU10) y registro de hallazgos: los de severidad Alta exigen riesgo vinculado y plan de acción (RN08).">
-        {tiene('AUDITOR_INTERNO', 'DIRECTOR') && <button className="boton primario" onClick={() => setNueva(true)}><CalendarPlus size={16} /> Planificar auditoría</button>}
+        {tiene('AUDITOR_INTERNO') && <button className="boton primario" onClick={() => setNueva(true)}><CalendarPlus size={16} /> Planificar auditoría</button>}
       </Encabezado>
       <div className="rejilla r-4" style={{ marginBottom: 16 }}>
         <Kpi titulo="Auditorías del año" valor={lista.length} icono={<CalendarDays size={18} />} />

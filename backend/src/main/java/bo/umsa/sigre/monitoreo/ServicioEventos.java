@@ -40,6 +40,7 @@ public class ServicioEventos implements SmartLifecycle {
 
     private final List<Suscripcion> suscripciones = new CopyOnWriteArrayList<>();
     private final ObjectMapper mapper;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
     private final String url;
     private final String usuarioBd;
     private final String claveBd;
@@ -48,10 +49,11 @@ public class ServicioEventos implements SmartLifecycle {
     private volatile Thread hilo;
     private volatile OffsetDateTime ultimoEvento;
 
-    public ServicioEventos(ObjectMapper mapper, @Value("${spring.datasource.url}") String url,
+    public ServicioEventos(ObjectMapper mapper, org.springframework.jdbc.core.JdbcTemplate jdbc, @Value("${spring.datasource.url}") String url,
                            @Value("${spring.datasource.username}") String usuarioBd,
                            @Value("${spring.datasource.password}") String claveBd) {
         this.mapper = mapper;
+        this.jdbc = jdbc;
         this.url = url;
         this.usuarioBd = usuarioBd;
         this.claveBd = claveBd;
@@ -83,13 +85,37 @@ public class ServicioEventos implements SmartLifecycle {
         ultimoEvento = OffsetDateTime.now();
         String tipo = String.valueOf(evento.getOrDefault("evento", "EVENTO"));
         Object destinatario = "NOTIFICACION".equals(tipo) ? evento.get("id_usuario") : null;
-        Object filial = evento.get("id_filial");
+        Integer filial = evento.get("id_filial") instanceof Number f ? f.intValue() : filialDe(evento);
         for (Suscripcion s : suscripciones) {
-            if (destinatario != null && ((Number) destinatario).intValue() != s.usuario().id()) continue;
-            if (destinatario == null && filial instanceof Number f && !s.usuario().accedeA(f.intValue())
-                    && !(evento.get("id_asignado") instanceof Number a && a.intValue() == s.usuario().id())) continue;
+            UsuarioSesion u = s.usuario();
+            if (destinatario != null) {
+                if (((Number) destinatario).intValue() != u.id()) continue;
+            } else {
+                boolean asignado = evento.get("id_asignado") instanceof Number a && a.intValue() == u.id();
+                // RN14: sin filial conocida, el evento solo llega a usuarios corporativos o al asignado
+                boolean visible = u.corporativo() || asignado || (filial != null && u.accedeA(filial));
+                if (!visible) continue;
+            }
             enviar(s, tipo, evento);
         }
+    }
+
+    /** Deduce la filial de un evento que no la trae (planes, acciones, validaciones, alertas de obligaciones). */
+    private Integer filialDe(Map<String, Object> evento) {
+        try {
+            if (evento.get("id_riesgo") instanceof Number r) {
+                return jdbc.queryForObject("SELECT id_filial FROM riesgo WHERE id_riesgo = ?", Integer.class, r.intValue());
+            }
+            if (evento.get("id_alerta") instanceof Number a) {
+                return jdbc.query("SELECT id_filial FROM v_alerta WHERE id_alerta = ?", rs -> rs.next() ? (Integer) rs.getObject(1) : null, a.intValue());
+            }
+            if (evento.get("id_obligacion") instanceof Number o) {
+                return jdbc.queryForObject("SELECT id_filial FROM obligacion WHERE id_obligacion = ?", Integer.class, o.intValue());
+            }
+        } catch (RuntimeException e) {
+            log.debug("No se pudo deducir la filial del evento: {}", e.getMessage());
+        }
+        return null;
     }
 
     private void enviar(Suscripcion s, String tipo, Object datos) {

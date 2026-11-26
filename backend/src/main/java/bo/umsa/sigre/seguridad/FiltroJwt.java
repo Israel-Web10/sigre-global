@@ -24,9 +24,11 @@ import jakarta.servlet.http.HttpServletResponse;
 public class FiltroJwt extends OncePerRequestFilter {
 
     private final JwtService jwt;
+    private final ValidadorSesiones sesiones;
 
-    public FiltroJwt(JwtService jwt) {
+    public FiltroJwt(JwtService jwt, ValidadorSesiones sesiones) {
         this.jwt = jwt;
+        this.sesiones = sesiones;
     }
 
     @Override
@@ -36,11 +38,12 @@ public class FiltroJwt extends OncePerRequestFilter {
             String token = null;
             String cabecera = req.getHeader("Authorization");
             if (cabecera != null && cabecera.startsWith("Bearer ")) token = cabecera.substring(7);
-            else if ("GET".equals(req.getMethod())) token = req.getParameter("token");
+            // El token en la URL solo se acepta para el flujo de eventos (EventSource no envía encabezados)
+            else if ("GET".equals(req.getMethod()) && "/api/eventos".equals(req.getRequestURI())) token = req.getParameter("token");
 
             if (token != null) {
                 Map<String, Object> d = jwt.verificar(token);
-                if (d != null && "acceso".equals(d.get("tipo"))) {
+                if (d != null && "acceso".equals(d.get("tipo")) && sesiones.vigente(((Number) d.get("sub")).intValue(), d.get("ver"))) {
                     UsuarioSesion u = desdeToken(d);
                     var autoridades = u.roles().stream().map(r -> new SimpleGrantedAuthority("ROLE_" + r)).toList();
                     SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(u, null, autoridades));

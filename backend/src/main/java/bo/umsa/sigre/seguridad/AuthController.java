@@ -27,16 +27,18 @@ public class AuthController {
     private final TotpService totp;
     private final Consultas bd;
     private final PasswordEncoder claves;
+    private final ValidadorSesiones validador;
     private final boolean demo;
     private final String claveDemo;
 
-    public AuthController(ServicioSesion sesiones, TotpService totp, Consultas bd, PasswordEncoder claves,
+    public AuthController(ServicioSesion sesiones, TotpService totp, Consultas bd, PasswordEncoder claves, ValidadorSesiones validador,
                           @Value("${sigre.demo.habilitado:false}") boolean demo,
                           @Value("${sigre.demo.clave-usuarios:}") String claveDemo) {
         this.sesiones = sesiones;
         this.totp = totp;
         this.bd = bd;
         this.claves = claves;
+        this.validador = validador;
         this.demo = demo;
         this.claveDemo = claveDemo;
     }
@@ -44,6 +46,7 @@ public class AuthController {
     public record Login(@NotBlank String login, @NotBlank String clave) { }
     public record SegundoFactor(String desafio, String codigo) { }
     public record Codigo(String codigo) { }
+    public record Demo(String login) { }
     public record CambioClave(String actual, String nueva) { }
 
     @PostMapping("/login")
@@ -81,16 +84,32 @@ public class AuthController {
                 WHERE u.login IN ('crojas','mquispe','lmamani','jcondori','pvargas','dflores','rgutierrez','lparedes','cmunoz','admin','omendoza','sgomez')
                 GROUP BY u.id_usuario, f.id_filial
                 ORDER BY array_position(ARRAY['crojas','mquispe','lmamani','jcondori','pvargas','dflores','rgutierrez','lparedes','cmunoz','omendoza','sgomez','admin'], u.login)""");
-        return Map.of("habilitado", true, "clave", claveDemo, "usuarios", lista);
+        // La clave no se envía al navegador: el acceso rápido se resuelve en el servidor (POST /api/auth/demo)
+        return Map.of("habilitado", true, "usuarios", lista);
+    }
+
+    /** Acceso rápido de la demostración: entra con la clave de demostración configurada en el servidor. */
+    @PostMapping("/demo")
+    @Operation(summary = "Ingreso rápido de un usuario de demostración (solo con sigre.demo.habilitado=true)")
+    public Map<String, Object> ingresoDemo(@RequestBody Demo d) {
+        if (!demo || claveDemo == null || claveDemo.isBlank()) {
+            throw new ReglaNegocioException("El acceso rápido de demostración está deshabilitado", HttpStatus.NOT_FOUND);
+        }
+        return sesiones.login(d.login(), claveDemo);
     }
 
     @PostMapping("/2fa/iniciar")
     @Operation(summary = "Genera el secreto TOTP y el código QR para activar el doble factor")
-    public Map<String, Object> iniciarDobleFactor() {
+    public Map<String, Object> iniciarDobleFactor(@RequestBody(required = false) Codigo c) {
         UsuarioSesion u = UsuarioSesion.actual();
+        Map<String, Object> f = sesiones.fila(u.id());
+        // Si ya hay doble factor activo, cambiar de teléfono exige el código vigente
+        if (Boolean.TRUE.equals(f.get("totp_activo")) && (c == null || !totp.verificar((String) f.get("totp_secreto"), c.codigo()))) {
+            throw new ReglaNegocioException("RNF01: Para reconfigurar el doble factor ingrese el código actual", HttpStatus.BAD_REQUEST);
+        }
         String secreto = totp.nuevoSecreto();
-        bd.ejecutar("UPDATE usuario SET totp_secreto = :s, totp_activo = false WHERE id_usuario = :id",
-                Consultas.p("s", secreto, "id", u.id()));
+        // El secreto nuevo queda pendiente: el vigente sigue protegiendo la cuenta hasta confirmar
+        bd.ejecutar("UPDATE usuario SET totp_pendiente = :s WHERE id_usuario = :id", Consultas.p("s", secreto, "id", u.id()));
         return Map.of("secreto", secreto, "url", totp.urlOtpauth(u.login(), secreto));
     }
 
@@ -98,11 +117,13 @@ public class AuthController {
     @Operation(summary = "Activa el doble factor tras verificar un código")
     public Map<String, Object> confirmarDobleFactor(@RequestBody Codigo c) {
         UsuarioSesion u = UsuarioSesion.actual();
-        String secreto = (String) sesiones.fila(u.id()).get("totp_secreto");
+        String secreto = (String) sesiones.fila(u.id()).get("totp_pendiente");
+        if (secreto == null) throw new ReglaNegocioException("RNF01: Primero genere el código QR del doble factor");
         if (!totp.verificar(secreto, c.codigo())) {
             throw new ReglaNegocioException("RNF01: El código no coincide; revise la hora del teléfono e intente de nuevo");
         }
-        bd.ejecutar("UPDATE usuario SET totp_activo = true WHERE id_usuario = :id", Consultas.p("id", u.id()));
+        bd.ejecutar("UPDATE usuario SET totp_secreto = totp_pendiente, totp_pendiente = NULL, totp_activo = true WHERE id_usuario = :id",
+                Consultas.p("id", u.id()));
         return Map.of("totpActivo", true);
     }
 
@@ -130,6 +151,8 @@ public class AuthController {
             throw new ReglaNegocioException("RNF01: La nueva clave debe tener al menos 8 caracteres, letras y números", HttpStatus.BAD_REQUEST);
         }
         bd.ejecutar("UPDATE usuario SET clave_hash = :h WHERE id_usuario = :id", Consultas.p("h", claves.encode(c.nueva()), "id", u.id()));
-        return Map.of("ok", true);
+        // Las demás sesiones abiertas dejan de valer; esta recibe un token nuevo
+        validador.revocar(u.id());
+        return sesiones.emitirSesion(sesiones.fila(u.id()));
     }
 }

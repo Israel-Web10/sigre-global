@@ -90,7 +90,7 @@ public class ServicioAlertas {
                 "atender", puedeOperar(u, a) && List.of("NOTIFICADA", "ESCALADA", "RESUELTA").contains(a.get("estado")),
                 "resolver", puedeOperar(u, a) && "EN_ATENCION".equals(a.get("estado")),
                 "cerrar", puedeCerrar(u, a) && "RESUELTA".equals(a.get("estado")),
-                "escalar", u.tieneAlguno(UsuarioSesion.GESTOR, UsuarioSesion.DIRECTOR, UsuarioSesion.ADMIN)
+                "escalar", u.tieneAlguno(UsuarioSesion.DIRECTOR, UsuarioSesion.ADMIN)
                         && List.of("NOTIFICADA", "EN_ATENCION").contains(a.get("estado"))));
         return d;
     }
@@ -101,13 +101,13 @@ public class ServicioAlertas {
         if (!asignado && !u.accedeA(filial)) throw ReglaNegocioException.prohibido("RN14: No tiene acceso a esta alerta");
     }
 
+    /** CU08 y Tabla 47: atiende, resuelve y cierra la alerta quien la tiene asignada. */
     private static boolean puedeOperar(UsuarioSesion u, Map<String, Object> a) {
-        return ((Number) a.get("id_asignado")).intValue() == u.id()
-                || u.tieneAlguno(UsuarioSesion.GESTOR, UsuarioSesion.DIRECTOR);
+        return ((Number) a.get("id_asignado")).intValue() == u.id();
     }
 
     private static boolean puedeCerrar(UsuarioSesion u, Map<String, Object> a) {
-        return puedeOperar(u, a) || u.tieneAlguno(UsuarioSesion.OFICIAL, UsuarioSesion.AUDITOR_FINANCIERO);
+        return puedeOperar(u, a);
     }
 
     private Alerta alerta(UsuarioSesion u, int id, boolean cerrar) {
@@ -115,7 +115,7 @@ public class ServicioAlertas {
         if (a == null) throw ReglaNegocioException.noEncontrado("La alerta");
         verificarAcceso(u, a);
         if (!(cerrar ? puedeCerrar(u, a) : puedeOperar(u, a))) {
-            throw ReglaNegocioException.prohibido("CU08: Solo el responsable asignado o el Gestor de Riesgos atiende la alerta");
+            throw ReglaNegocioException.prohibido("CU08: Solo el responsable asignado atiende la alerta");
         }
         return dominio.buscar(Alerta.class, id, "La alerta");
     }
@@ -155,15 +155,24 @@ public class ServicioAlertas {
     /** Escalamiento manual (por ejemplo, cuando el responsable está ausente). */
     @Transactional
     public Map<String, Object> escalarManual(UsuarioSesion u, int id) {
-        u.exigir("escalar alertas", UsuarioSesion.GESTOR, UsuarioSesion.DIRECTOR, UsuarioSesion.ADMIN);
+        u.exigir("escalar alertas", UsuarioSesion.DIRECTOR, UsuarioSesion.ADMIN);
         Alerta a = dominio.buscar(Alerta.class, id, "La alerta");
         escalar(a, "Escalamiento manual de " + u.nombre());
         return Map.of("id_alerta", id, "estado", a.getEstado().name(), "nivel", a.getNivelEscalamiento());
     }
 
+    /** Superior jerárquico del asignado o, si no tiene, el Director de Riesgos (excepción de CU09). */
+    private Integer destinoEscalamiento(Integer asignado) {
+        return bd.valor("""
+                SELECT coalesce(u.id_superior,
+                         (SELECT d.id_usuario FROM usuario d JOIN usuario_rol ur USING (id_usuario) JOIN rol r USING (id_rol)
+                          WHERE r.codigo = 'DIRECTOR' AND d.activo AND d.id_usuario <> u.id_usuario ORDER BY d.id_usuario LIMIT 1))
+                FROM usuario u WHERE u.id_usuario = :u""", p("u", asignado), Integer.class);
+    }
+
     private void escalar(Alerta a, String motivo) {
         Integer anterior = a.getIdAsignado();
-        Integer superior = bd.valor("SELECT id_superior FROM usuario WHERE id_usuario = :u", p("u", anterior), Integer.class);
+        Integer superior = destinoEscalamiento(anterior);
         a.escalar(superior);
         dominio.sincronizar(a);
         String titulo = "Alerta escalada (nivel " + a.getNivelEscalamiento() + ")";
@@ -175,13 +184,19 @@ public class ServicioAlertas {
                 VALUES (:u, :t, :m, 'ESCALAMIENTO', 'CORREO', '/alertas')""", p("u", superior, "t", titulo, "m", mensaje));
         bd.valor("SELECT fn_notificar(:u, 'Su alerta fue escalada', :m, 'ESCALAMIENTO', '/alertas')",
                 p("u", anterior, "m", a.getMensaje() + " · se escaló a su superior por " + motivo.toLowerCase()), Object.class);
+        // CU09 paso 4: el Director de Riesgos también recibe el aviso del escalamiento
+        bd.lista("""
+                SELECT fn_notificar(u.id_usuario, 'Escalamiento de alerta', :m, 'ESCALAMIENTO', '/alertas')
+                FROM usuario u JOIN usuario_rol ur USING (id_usuario) JOIN rol r USING (id_rol)
+                WHERE r.codigo = 'DIRECTOR' AND u.activo AND u.id_usuario <> :s""",
+                p("m", "Nivel " + a.getNivelEscalamiento() + ": " + a.getMensaje(), "s", superior));
     }
 
     /** CU09: alertas notificadas que no se atendieron dentro del SLA. */
     public int escalarVencidas() {
         List<Integer> vencidas = bd.jdbc().queryForList("""
-                SELECT a.id_alerta FROM alerta a JOIN usuario u ON u.id_usuario = a.id_asignado
-                WHERE a.estado = 'NOTIFICADA' AND a.fecha_limite < now() AND u.id_superior IS NOT NULL
+                SELECT a.id_alerta FROM alerta a
+                WHERE a.estado IN ('NOTIFICADA', 'EN_ATENCION') AND a.fecha_limite < now()
                 ORDER BY a.fecha_limite LIMIT 50""", Map.of(), Integer.class);
         int n = 0;
         for (Integer id : vencidas) {
@@ -197,6 +212,9 @@ public class ServicioAlertas {
 
     private void escalarUna(int id) {
         Alerta a = dominio.buscar(Alerta.class, id, "La alerta");
-        if (a.getEstado() == EstadoAlerta.NOTIFICADA && a.slaVencido()) escalar(a, "SLA de " + a.getSlaHorasTexto() + " vencido (RN07)");
+        boolean pendiente = a.getEstado() == EstadoAlerta.NOTIFICADA || a.getEstado() == EstadoAlerta.EN_ATENCION;
+        if (pendiente && a.slaVencido() && destinoEscalamiento(a.getIdAsignado()) != null) {
+            escalar(a, "SLA de " + a.getSlaHorasTexto() + " vencido (RN07)");
+        }
     }
 }

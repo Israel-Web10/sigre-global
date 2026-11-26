@@ -18,6 +18,11 @@ export default function Validacion() {
     if (!elegida && pendientes?.length) setElegida(pendientes.find((p) => !p.conflicto)?.id_evaluacion ?? pendientes[0].id_evaluacion);
   }, [pendientes, elegida]);
   const lista = pendientes ?? [];
+  const elegir = (id: number) => {
+    setElegida(id);
+    // En el teléfono la bandeja y el detalle se apilan: se lleva al usuario al detalle
+    if (window.matchMedia('(max-width: 767px)').matches) setTimeout(() => document.getElementById('panel-validacion')?.scrollIntoView({ behavior: 'smooth' }), 120);
+  };
   return (
     <>
       <Encabezado icono={<Scale size={22} />} titulo="Validación financiera (CU17 · P02)"
@@ -31,11 +36,11 @@ export default function Validacion() {
       <Pestanas id="val" valor={pestana} cambiar={setPestana} opciones={[{ valor: 'pendientes', texto: 'Bandeja', contador: lista.length }, { valor: 'historial', texto: 'Validaciones realizadas' }]} />
       {pestana === 'pendientes' ? (
         !pendientes ? <Cargando /> : lista.length === 0 ? <Tarjeta><Vacio texto="No hay evaluaciones pendientes de validación" icono={<BadgeCheck size={36} />} /></Tarjeta> : (
-          <div className="rejilla" style={{ gridTemplateColumns: 'minmax(260px, 340px) 1fr', gap: 16 }}>
+          <div className="rejilla validacion-rejilla">
             <div className="columna" style={{ gap: 10 }}>
               {lista.map((p, k) => (
                 <motion.div key={p.id_evaluacion} className="tarjeta" initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: k * 0.05 }}
-                  onClick={() => setElegida(p.id_evaluacion)} style={{ padding: 14, cursor: 'pointer', borderColor: elegida === p.id_evaluacion ? 'var(--acento)' : undefined, boxShadow: elegida === p.id_evaluacion ? 'var(--brillo)' : undefined }}>
+                  onClick={() => elegir(p.id_evaluacion)} onKeyDown={(e) => e.key === 'Enter' && elegir(p.id_evaluacion)} tabIndex={0} role="button" aria-pressed={elegida === p.id_evaluacion} style={{ padding: 14, cursor: 'pointer', borderColor: elegida === p.id_evaluacion ? 'var(--acento)' : undefined, boxShadow: elegida === p.id_evaluacion ? 'var(--brillo)' : undefined }}>
                   <div className="fila entre"><span className="codigo">{p.codigo}</span><ChipNivel nivel={p.nivel} valor={p.valor} /></div>
                   <div style={{ fontWeight: 600, margin: '6px 0 4px', fontSize: 13 }}>{p.titulo}</div>
                   <div className="pequeno tenue"><Bandera codigo={p.codigo_pais} /> {p.filial} · {usd(p.impacto_usd, true)}</div>
@@ -46,7 +51,7 @@ export default function Validacion() {
                 </motion.div>
               ))}
             </div>
-            {elegida && <PanelValidacion key={elegida} id={elegida} alValidar={() => { setElegida(null); recargar(); recargarH(); }} />}
+            {elegida && <div id="panel-validacion" style={{ scrollMarginTop: 80 }}><PanelValidacion key={elegida} id={elegida} alValidar={() => { setElegida(null); recargar(); recargarH(); }} /></div>}
           </div>
         )
       ) : (

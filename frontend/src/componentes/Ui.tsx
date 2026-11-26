@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { AnimatePresence, animate, motion, useInView } from 'framer-motion';
 import { ArrowDown, ArrowUp, Clock, Inbox, Loader2, UploadCloud, X } from 'lucide-react';
-import { banderaHtml, colorNivel, colorSemaforo, colorSeveridad, etiqueta, iniciales, restante } from '../nucleo/formato';
+import { banderaHtml, colorNivel, colorNivelSolido, colorSemaforo, colorSeveridad, etiqueta, iniciales, restante } from '../nucleo/formato';
 
 // ---------------------------------------------------------------- Tarjeta con inclinación 3D
 
@@ -97,7 +97,7 @@ export function Chip({ color, children, solido = false, punto = true, title }: {
 
 export const ChipNivel = ({ nivel, valor }: { nivel?: string | null; valor?: number | null }) =>
   nivel ? (
-    <Chip color={colorNivel(nivel)} solido>
+    <Chip color={colorNivelSolido(nivel)} solido>
       {etiqueta(nivel)}
       {valor != null && <span style={{ opacity: 0.85 }}>· {valor}</span>}
     </Chip>
@@ -177,17 +177,49 @@ export function Modal({
   abierto: boolean; cerrar: () => void; titulo: ReactNode; subtitulo?: ReactNode; icono?: ReactNode; children: ReactNode;
   pie?: ReactNode; ancho?: boolean;
 }) {
+  const caja = useRef<HTMLDivElement>(null);
+  const idTitulo = useId();
+  const alCerrar = useRef(cerrar);
+  alCerrar.current = cerrar;
   useEffect(() => {
     if (!abierto) return;
-    const k = (e: KeyboardEvent) => e.key === 'Escape' && cerrar();
+    // Accesibilidad: foco inicial dentro del diálogo, Tab que no sale de él y foco devuelto al cerrar
+    const anterior = document.activeElement as HTMLElement | null;
+    const enfocables = () =>
+      Array.from(caja.current?.querySelectorAll<HTMLElement>('input:not([disabled]),select:not([disabled]),textarea:not([disabled]),button:not([disabled]),a[href],[tabindex]:not([tabindex="-1"])') ?? []);
+    const t = setTimeout(() => {
+      const cuerpo = enfocables().find((e) => !e.closest('.modal-cabecera'));
+      (cuerpo ?? enfocables()[0] ?? caja.current)?.focus();
+    }, 60);
+    const k = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') alCerrar.current();
+      if (e.key !== 'Tab') return;
+      const lista = enfocables();
+      if (!lista.length) return;
+      const primero = lista[0];
+      const ultimo = lista[lista.length - 1];
+      if (e.shiftKey && (document.activeElement === primero || !caja.current?.contains(document.activeElement))) {
+        e.preventDefault();
+        ultimo.focus();
+      } else if (!e.shiftKey && (document.activeElement === ultimo || !caja.current?.contains(document.activeElement))) {
+        e.preventDefault();
+        primero.focus();
+      }
+    };
     window.addEventListener('keydown', k);
-    return () => window.removeEventListener('keydown', k);
-  }, [abierto, cerrar]);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener('keydown', k);
+      anterior?.focus?.();
+    };
+  }, [abierto]);
   return (
     <AnimatePresence>
       {abierto && (
         <motion.div className="velo" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onMouseDown={(e) => e.target === e.currentTarget && cerrar()}>
           <motion.div
+            ref={caja}
+            tabIndex={-1}
             className={`modal ${ancho ? 'ancho' : ''}`}
             initial={{ opacity: 0, y: 30, scale: 0.96, rotateX: 8 }}
             animate={{ opacity: 1, y: 0, scale: 1, rotateX: 0 }}
@@ -195,11 +227,12 @@ export function Modal({
             transition={{ type: 'spring', damping: 26, stiffness: 300 }}
             role="dialog"
             aria-modal="true"
+            aria-labelledby={idTitulo}
           >
             <div className="modal-cabecera">
-              {icono && <span className="icono-titulo">{icono}</span>}
+              {icono && <span className="icono-titulo" aria-hidden="true">{icono}</span>}
               <div className="crece">
-                <h2>{titulo}</h2>
+                <h2 id={idTitulo}>{titulo}</h2>
                 {subtitulo && <p>{subtitulo}</p>}
               </div>
               <button className="icono-btn" onClick={cerrar} aria-label="Cerrar">
@@ -343,9 +376,9 @@ export interface ColumnaTabla<T> {
 }
 
 export function Tabla<T extends Record<string, any>>({
-  filas, columnas, alClic, clave, vacio = 'Sin registros', maxAlto,
+  filas, columnas, alClic, clave, vacio = 'Sin registros', maxAlto, etiqueta = 'Tabla de datos',
 }: {
-  filas: T[]; columnas: ColumnaTabla<T>[]; alClic?: (f: T) => void; clave: (f: T) => string | number; vacio?: string; maxAlto?: number;
+  filas: T[]; columnas: ColumnaTabla<T>[]; alClic?: (f: T) => void; clave: (f: T) => string | number; vacio?: string; maxAlto?: number; etiqueta?: string;
 }) {
   const [orden, setOrden] = useState<{ c: string; asc: boolean } | null>(null);
   const ordenadas = useMemo(() => {
@@ -361,7 +394,7 @@ export function Tabla<T extends Record<string, any>>({
   }, [filas, orden, columnas]);
   if (!filas.length) return <Vacio texto={vacio} />;
   return (
-    <div className="tabla-contenedor" style={maxAlto ? { maxHeight: maxAlto } : undefined}>
+    <div className="tabla-contenedor" style={maxAlto ? { maxHeight: maxAlto } : undefined} tabIndex={0} role="region" aria-label={etiqueta}>
       <table className="tabla">
         <thead>
           <tr>
@@ -384,6 +417,8 @@ export function Tabla<T extends Record<string, any>>({
               key={clave(f)}
               className={alClic ? 'clic' : ''}
               onClick={() => alClic?.(f)}
+              tabIndex={alClic ? 0 : undefined}
+              onKeyDown={alClic ? (e) => e.key === 'Enter' && alClic(f) : undefined}
               initial={{ opacity: 0, x: -6 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: Math.min(i * 0.015, 0.35) }}

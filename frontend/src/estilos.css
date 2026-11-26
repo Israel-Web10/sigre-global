@@ -19,7 +19,11 @@
   --borde-fuerte: rgba(148, 170, 210, 0.26);
   --texto: #e7eefa;
   --texto-2: #a9b8d2;
-  --texto-3: #6f82a3;
+  --texto-3: #8397b8;
+  --bajo-solido: #15803d;
+  --medio-solido: #a16207;
+  --alto-solido: #c2410c;
+  --critico-solido: #b91c1c;
   --acento: #22d3ee;
   --acento-2: #6366f1;
   --acento-3: #a855f7;
@@ -52,7 +56,7 @@
   --borde-fuerte: rgba(30, 50, 90, 0.22);
   --texto: #0c1729;
   --texto-2: #3c4d6b;
-  --texto-3: #6a7a96;
+  --texto-3: #566580;
   --acento: #0891b2;
   --acento-2: #4f46e5;
   --acento-suave: rgba(8, 145, 178, 0.1);
@@ -132,6 +136,13 @@ code, .mono { font-family: var(--fuente-mono); font-size: 12.5px; }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-thumb { background: var(--superficie-3); border-radius: 10px; border: 2px solid transparent; background-clip: padding-box; }
 ::-webkit-scrollbar-track { background: transparent; }
+
+:where(a, button, [role='tab'], select, input, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--acento);
+  outline-offset: 2px;
+}
+
+.entrada:focus-visible { outline: none; }
 
 :root[data-animaciones='no'] *,
 :root[data-animaciones='no'] *::before,
@@ -774,9 +785,10 @@ table.tabla { width: 100%; border-collapse: collapse; font-size: 13px; }
 
 /* ------------------------------------------------------------------ Tablero de alertas (kanban) */
 
-.kanban { display: grid; grid-template-columns: repeat(5, minmax(240px, 1fr)); gap: 14px; overflow-x: auto; padding-bottom: 8px; }
+.kanban { display: grid; grid-template-columns: repeat(5, minmax(240px, 1fr)); gap: 14px; overflow-x: auto; padding-bottom: 8px; scroll-snap-type: x proximity; }
+.kanban-columna { scroll-snap-align: start; }
 .kanban-columna { background: var(--superficie); border: 1px solid var(--borde); border-radius: var(--radio); padding: 12px; min-height: 300px; display: flex; flex-direction: column; gap: 10px; }
-.kanban-columna h3 { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 2px 4px 6px; }
+.kanban-columna h2 { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 2px 4px 6px; }
 .tarjeta-alerta { position: relative; padding: 12px 12px 12px 15px; border-radius: 12px; background: var(--superficie-2); border: 1px solid var(--borde); cursor: pointer; transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s; overflow: hidden; }
 .tarjeta-alerta::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--color, var(--info)); }
 .tarjeta-alerta:hover { transform: translateY(-2px); box-shadow: var(--sombra-suave); border-color: var(--borde-fuerte); }
@@ -870,6 +882,10 @@ table.tabla { width: 100%; border-collapse: collapse; font-size: 13px; }
 .consola div { padding: 2px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .navegacion-movil { display: none; }
+.hoja-movil { display: none; }
+.validacion-rejilla { grid-template-columns: minmax(260px, 340px) minmax(0, 1fr); gap: 16px; }
+.validacion-rejilla > * { min-width: 0; }
+.cabecera .titulo-pagina small, .cabecera .titulo-pagina strong { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* ------------------------------------------------------------------ Animaciones */
 
@@ -935,6 +951,51 @@ table.tabla { width: 100%; border-collapse: collapse; font-size: 13px; }
   .kanban { grid-template-columns: repeat(5, 82vw); }
   .ventana { left: 8px !important; right: 8px !important; width: auto !important; top: 70px !important; height: 70vh !important; }
   .avisos { top: auto; bottom: 90px; right: 10px; left: 10px; width: auto; }
+
+  /* Revisión de accesibilidad móvil: objetivos táctiles de 44 px, áreas seguras y legibilidad */
+  .r-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .kpi .kpi-fondo { display: none; }
+  .kpi .kpi-valor { font-size: 23px; }
+  .kpi { padding: 14px; }
+  .icono-btn { width: 44px; height: 44px; }
+  .boton { min-height: 44px; }
+  .boton.chico { min-height: 38px; }
+  .segmentado button, .pestanas button { min-height: 44px; }
+  input[type='checkbox'] { width: 22px; height: 22px; }
+  .entrada, select.entrada, textarea.entrada { font-size: 16px; min-height: 44px; }
+  .cabecera { padding-top: env(safe-area-inset-top); height: calc(var(--cabecera) + env(safe-area-inset-top)); }
+  .cabecera .titulo-pagina { flex: 1; }
+  .contenido { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+  .navegacion-movil { bottom: calc(10px + env(safe-area-inset-bottom)); }
+  .navegacion-movil a, .navegacion-movil button { min-width: 60px; min-height: 48px; justify-content: center; font-size: 11px; color: var(--texto-2); }
+  .navegacion-movil button { display: flex; flex-direction: column; align-items: center; gap: 3px; border: 0; background: none; font: inherit; font-size: 11px; color: var(--texto-2); padding: 4px 8px; border-radius: 12px; cursor: pointer; }
+  .navegacion-movil button.activo { color: var(--acento); background: var(--acento-suave); }
+  .hoja-movil {
+    display: block;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 39;
+    max-height: 78vh;
+    overflow-y: auto;
+    padding: 10px 14px calc(96px + env(safe-area-inset-bottom));
+    border-radius: 22px 22px 0 0;
+    background: var(--superficie-solida);
+    border-top: 1px solid var(--borde-fuerte);
+    box-shadow: 0 -30px 70px -20px rgba(0, 0, 0, 0.7);
+  }
+  .hoja-asa { display: block; width: 44px; height: 5px; border-radius: 5px; background: var(--borde-fuerte); margin: 2px auto 8px; }
+  .hoja-rejilla { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 8px; }
+  .hoja-rejilla a { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 6px; min-height: 76px; border-radius: 14px; background: var(--superficie-2); color: var(--texto-2); font-size: 11.5px; text-align: center; line-height: 1.25; }
+  .hoja-rejilla a.activo { color: var(--acento); background: var(--acento-suave); box-shadow: inset 0 0 0 1px rgba(34, 211, 238, 0.35); }
+  .validacion-rejilla { grid-template-columns: minmax(0, 1fr); }
+  .kanban { scroll-snap-type: x mandatory; }
+  .kanban-columna { scroll-snap-align: center; }
+  .filtros > * { flex: 1 1 100% !important; width: 100% !important; max-width: 100% !important; }
+  .login-escena .globo { top: 0; right: 0; bottom: 0; left: 0; }
+  .avisos { bottom: calc(96px + env(safe-area-inset-bottom)); }
+  .campo .ayuda { font-size: 12.5px; }
 }
 
 /* ------------------------------------------------------------------ Globo 3D */

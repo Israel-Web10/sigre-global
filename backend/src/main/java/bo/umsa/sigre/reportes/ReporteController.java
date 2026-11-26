@@ -44,20 +44,22 @@ public class ReporteController {
             UsuarioSesion.AUDITOR_INTERNO, UsuarioSesion.AUDITOR_FINANCIERO, UsuarioSesion.OFICIAL, UsuarioSesion.ADMIN};
 
     private static final List<Reporte> REPORTES = List.of(
-            new Reporte("riesgos", "Matriz de riesgos corporativa", "Catálogo con nivel inherente, plan y avance (RF22)", GERENCIA),
+            new Reporte("riesgos", "Registro de riesgos", "Catálogo con nivel inherente, plan y avance (RF18)", GERENCIA),
+            new Reporte("planes", "Planes de mitigación", "Estrategia, acciones, costo, avance y aprobación (RF18, CU03, CU04)", GERENCIA),
             new Reporte("financiero", "Exposición financiera validada", "Impacto declarado frente al validado y conciliaciones (RF24)",
                     new String[]{UsuarioSesion.DIRECTOR, UsuarioSesion.AUDITOR_FINANCIERO, UsuarioSesion.AUDITOR_INTERNO, UsuarioSesion.GESTOR}),
-            new Reporte("cumplimiento", "Estado del cumplimiento normativo", "Obligaciones por filial con su vencimiento (RF17)", GERENCIA),
-            new Reporte("alertas", "Atención de alertas y SLA", "Tiempos de atención, resolución y escalamiento (RN07)", GERENCIA),
-            new Reporte("auditorias", "Plan de auditorías y hallazgos", "Hallazgos por auditoría y su estado (RF14)",
+            new Reporte("cumplimiento", "Estado del cumplimiento normativo", "Obligaciones por filial con su vencimiento y riesgo legal (RF18, RF16)", GERENCIA),
+            new Reporte("alertas", "Atención de alertas y SLA", "Tiempos de atención, resolución y escalamiento (RF18, RN07)", GERENCIA),
+            new Reporte("auditorias", "Hallazgos de auditoría", "Hallazgos por auditoría con su seguimiento (RF18, RF14)",
                     new String[]{UsuarioSesion.DIRECTOR, UsuarioSesion.AUDITOR_INTERNO, UsuarioSesion.AUDITOR_FINANCIERO, UsuarioSesion.ADMIN}),
-            new Reporte("bitacora", "Bitácora de auditoría", "Operaciones registradas por los triggers (RN13)",
+            new Reporte("bitacora", "Bitácora de auditoría", "Operaciones registradas por los triggers (RF20, RN13)",
                     new String[]{UsuarioSesion.AUDITOR_INTERNO, UsuarioSesion.AUDITOR_FINANCIERO, UsuarioSesion.DIRECTOR, UsuarioSesion.ADMIN}));
 
     @GetMapping("/api/tablero")
     @Operation(summary = "CU14: indicadores, mapa de calor, filiales y tendencias")
-    public Map<String, Object> tablero(@RequestParam(required = false) Integer filial, @RequestParam(required = false) String categoria) {
-        return tablero.tablero(UsuarioSesion.actual(), filial, categoria);
+    public Map<String, Object> tablero(@RequestParam(required = false) Integer filial, @RequestParam(required = false) String categoria,
+                                       @RequestParam(required = false) String region, @RequestParam(defaultValue = "30") int dias) {
+        return tablero.tablero(UsuarioSesion.actual(), filial, categoria, region, dias);
     }
 
     @GetMapping("/api/reportes")
@@ -67,9 +69,11 @@ public class ReporteController {
                 .map(r -> Map.<String, Object>of("clave", r.clave(), "titulo", r.titulo(), "descripcion", r.descripcion())).toList();
     }
 
-    @GetMapping("/api/reportes/{clave}.xlsx")
-    @Operation(summary = "Descargar un reporte en Excel")
-    public ResponseEntity<byte[]> descargar(@PathVariable String clave, @RequestParam(required = false) Integer filial) {
+    @GetMapping("/api/reportes/{clave}.{formato}")
+    @Operation(summary = "Descargar un reporte en Excel (xlsx), PDF o CSV (RF18, RNF08)")
+    public ResponseEntity<byte[]> descargar(@PathVariable String clave, @PathVariable String formato,
+                                            @RequestParam(required = false) Integer filial) {
+        if (!List.of("xlsx", "pdf", "csv").contains(formato)) throw ReglaNegocioException.noEncontrado("El formato " + formato);
         UsuarioSesion u = UsuarioSesion.actual();
         Reporte r = REPORTES.stream().filter(x -> x.clave().equals(clave)).findFirst()
                 .orElseThrow(() -> ReglaNegocioException.noEncontrado("El reporte"));
@@ -79,7 +83,7 @@ public class ReporteController {
         String sub = "Generado el " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")) + " por "
                 + u.nombre() + " · Alcance: " + alcance + " · SIGRE Global";
         byte[] libro = switch (clave) {
-            case "riesgos" -> XlsxEscritor.libro("Riesgos", r.titulo(), sub, List.of(
+            case "riesgos" -> generar(formato, "Riesgos", r.titulo(), sub, List.of(
                     new Columna("codigo", "Código", 14), new Columna("titulo", "Riesgo", 46), new Columna("categoria", "Categoría", 14),
                     new Columna("filial", "Filial", 20), new Columna("estado", "Estado", 15), new Columna("probabilidad", "P", 5),
                     new Columna("impacto", "I", 5), new Columna("valor", "Nivel", 7), new Columna("nivel", "Clasificación", 12),
@@ -89,7 +93,21 @@ public class ReporteController {
                     new Columna("alertas_abiertas", "Alertas", 8), new Columna("responsable", "Responsable", 24),
                     new Columna("vigente_hasta", "Vigente hasta", 13)),
                     bd.lista("SELECT * FROM v_riesgo WHERE TRUE" + c.sql() + " ORDER BY coalesce(valor, 0) DESC, codigo", c.params()));
-            case "financiero" -> XlsxEscritor.libro("Financiero", r.titulo(), sub, List.of(
+            case "planes" -> generar(formato, "Planes", r.titulo(), sub, List.of(
+                    new Columna("codigo", "Riesgo", 14), new Columna("titulo", "Título", 40), new Columna("filial", "Filial", 20),
+                    new Columna("nivel", "Nivel", 10), new Columna("estrategia", "Estrategia", 12), new Columna("estado_plan", "Estado", 12),
+                    new Columna("acciones", "Acciones", 9), new Columna("cerradas", "Cerradas", 9), new Columna("avance", "Avance %", 9),
+                    new Columna("costo_estimado", "Costo", 13), new Columna("fecha_fin", "Fin previsto", 12),
+                    new Columna("proponente", "Propuesto por", 20), new Columna("aprobador", "Aprobado por", 20)),
+                    bd.lista("""
+                            SELECT v.codigo, v.titulo, v.filial, v.nivel, p.estrategia, p.estado AS estado_plan, p.costo_estimado, p.fecha_fin,
+                                   (SELECT count(*) FROM accion_mitigacion a WHERE a.id_plan = p.id_plan) AS acciones,
+                                   (SELECT count(*) FROM accion_mitigacion a WHERE a.id_plan = p.id_plan AND a.estado = 'CERRADA') AS cerradas,
+                                   v.avance_plan AS avance, up.nombre_completo AS proponente, ua.nombre_completo AS aprobador
+                            FROM plan_mitigacion p JOIN v_riesgo v ON v.id_riesgo = p.id_riesgo
+                            LEFT JOIN usuario up ON up.id_usuario = p.id_proponente LEFT JOIN usuario ua ON ua.id_usuario = p.id_aprobador
+                            WHERE TRUE""" + c.sql().replace("id_filial", "v.id_filial") + " ORDER BY v.valor DESC NULLS LAST, v.codigo", c.params()));
+            case "financiero" -> generar(formato, "Financiero", r.titulo(), sub, List.of(
                     new Columna("codigo", "Código", 14), new Columna("titulo", "Riesgo", 42), new Columna("filial", "Filial", 20),
                     new Columna("nivel", "Nivel", 10), new Columna("impacto_financiero", "Impacto local", 16), new Columna("moneda", "Moneda", 8),
                     new Columna("tipo_cambio", "TC evaluación", 13), new Columna("impacto_usd", "Impacto USD declarado", 18),
@@ -102,7 +120,7 @@ public class ReporteController {
                             LEFT JOIN usuario u ON u.id_usuario = vf.id_auditor_fin
                             WHERE v.impacto_financiero IS NOT NULL""" + c.sql().replace("id_filial", "v.id_filial")
                             + " ORDER BY v.impacto_usd DESC NULLS LAST", c.params()));
-            case "cumplimiento" -> XlsxEscritor.libro("Cumplimiento", r.titulo(), sub, List.of(
+            case "cumplimiento" -> generar(formato, "Cumplimiento", r.titulo(), sub, List.of(
                     new Columna("normativa", "Normativa", 40), new Columna("organismo", "Organismo", 14), new Columna("filial", "Filial", 20),
                     new Columna("descripcion", "Obligación", 50), new Columna("periodicidad", "Periodicidad", 12),
                     new Columna("fecha_vencimiento", "Vence", 12), new Columna("dias", "Días", 7),
@@ -113,7 +131,7 @@ public class ReporteController {
                             FROM obligacion o JOIN normativa n USING (id_normativa) JOIN filial f ON f.id_filial = o.id_filial
                             LEFT JOIN riesgo r ON r.id_riesgo = o.id_riesgo_generado WHERE TRUE"""
                             + c.sql().replace("id_filial", "o.id_filial") + " ORDER BY o.fecha_vencimiento", c.params()));
-            case "alertas" -> XlsxEscritor.libro("Alertas", r.titulo(), sub, List.of(
+            case "alertas" -> generar(formato, "Alertas", r.titulo(), sub, List.of(
                     new Columna("id_alerta", "N.º", 6), new Columna("tipo", "Tipo", 22), new Columna("severidad", "Severidad", 12),
                     new Columna("riesgo_codigo", "Riesgo", 14), new Columna("filial", "Filial", 20), new Columna("mensaje", "Mensaje", 60),
                     new Columna("estado", "Estado", 12), new Columna("asignado", "Asignado", 22), new Columna("sla_horas", "SLA h", 7),
@@ -126,7 +144,7 @@ public class ReporteController {
                                    CASE WHEN a.fecha_resolucion IS NULL THEN NULL ELSE a.fecha_resolucion <= a.fecha_limite END AS sla_cumplido
                             FROM v_alerta a WHERE TRUE""" + c.sql().replace("id_filial", "a.id_filial")
                             + " ORDER BY a.fecha_generacion DESC", c.params()));
-            case "auditorias" -> XlsxEscritor.libro("Hallazgos", r.titulo(), sub, List.of(
+            case "auditorias" -> generar(formato, "Hallazgos", r.titulo(), sub, List.of(
                     new Columna("auditoria", "Auditoría", 14), new Columna("tipo", "Tipo", 13), new Columna("filial", "Filial", 20),
                     new Columna("estado_auditoria", "Estado auditoría", 14), new Columna("descripcion", "Hallazgo", 60),
                     new Columna("severidad", "Severidad", 10), new Columna("riesgo", "Riesgo", 14), new Columna("responsable", "Responsable", 22),
@@ -137,7 +155,7 @@ public class ReporteController {
                             FROM auditoria a JOIN filial f USING (id_filial) LEFT JOIN hallazgo h USING (id_auditoria)
                             LEFT JOIN riesgo r ON r.id_riesgo = h.id_riesgo LEFT JOIN usuario u ON u.id_usuario = h.id_responsable
                             WHERE TRUE""" + c.sql().replace("id_filial", "a.id_filial") + " ORDER BY a.fecha_inicio, h.id_hallazgo", c.params()));
-            case "bitacora" -> XlsxEscritor.libro("Bitácora", r.titulo(), sub, List.of(
+            case "bitacora" -> generar(formato, "Bitácora", r.titulo(), sub, List.of(
                     new Columna("id_bitacora", "N.º", 8), new Columna("fecha_hora", "Fecha y hora", 17), new Columna("usuario", "Usuario", 24),
                     new Columna("operacion", "Operación", 26), new Columna("entidad", "Entidad", 20), new Columna("id_entidad", "Id", 7),
                     new Columna("resultado", "Resultado", 11), new Columna("origen", "Origen", 11), new Columna("detalle_texto", "Detalle", 80)),
@@ -147,11 +165,44 @@ public class ReporteController {
                             FROM bitacora b LEFT JOIN usuario u USING (id_usuario) ORDER BY b.fecha_hora DESC LIMIT 5000"""));
             default -> throw ReglaNegocioException.noEncontrado("El reporte");
         };
-        bitacora.registrar(u.id(), "EXPORTAR_REPORTE", "REPORTE", null, "OK", Map.of("reporte", clave, "alcance", alcance));
-        String nombre = "SIGRE_" + clave + "_" + LocalDate.now() + ".xlsx";
+        bitacora.registrar(u.id(), "EXPORTAR_REPORTE", "REPORTE", null, "OK", Map.of("reporte", clave, "formato", formato, "alcance", alcance));
+        String nombre = "SIGRE_" + clave + "_" + LocalDate.now() + "." + formato;
+        String tipo = switch (formato) {
+            case "pdf" -> "application/pdf";
+            case "csv" -> "text/csv;charset=UTF-8";
+            default -> "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+        };
         return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .contentType(MediaType.parseMediaType(tipo))
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(nombre).build().toString())
                 .body(libro);
+    }
+
+    /** Genera el reporte en el formato pedido a partir de las mismas columnas y filas. */
+    private static byte[] generar(String formato, String hoja, String titulo, String sub, List<Columna> columnas,
+                                  List<Map<String, Object>> filas) {
+        return switch (formato) {
+            case "pdf" -> PdfTabla.documento(titulo, sub, columnas, filas);
+            case "csv" -> csv(columnas, filas);
+            default -> XlsxEscritor.libro(hoja, titulo, sub, columnas, filas);
+        };
+    }
+
+    /** CSV separado por punto y coma, con BOM para que Excel en español lo abra con tildes (RNF08). */
+    private static byte[] csv(List<Columna> columnas, List<Map<String, Object>> filas) {
+        StringBuilder b = new StringBuilder("\uFEFF");
+        b.append(String.join(";", columnas.stream().map(c -> celda(c.titulo())).toList())).append("\r\n");
+        for (Map<String, Object> f : filas) {
+            b.append(String.join(";", columnas.stream().map(c -> celda(f.get(c.clave()))).toList())).append("\r\n");
+        }
+        return b.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    }
+
+    private static String celda(Object v) {
+        if (v == null) return "";
+        String t = v instanceof List<?> l ? String.join(", ", l.stream().map(String::valueOf).toList()) : String.valueOf(v);
+        // Evita que Excel interprete el texto como fórmula (inyección CSV)
+        if (!t.isEmpty() && "=+-@".indexOf(t.charAt(0)) >= 0 && !(v instanceof Number)) t = "'" + t;
+        return "\"" + t.replace("\"", "\"\"").replace("\r", " ").replace("\n", " ") + "\"";
     }
 }

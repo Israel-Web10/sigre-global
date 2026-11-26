@@ -53,7 +53,7 @@ public class ServicioTratamiento {
 
     @Transactional
     public Map<String, Object> guardarPlan(UsuarioSesion u, int idRiesgo, DatosPlan d) {
-        u.exigir("definir planes de mitigación", UsuarioSesion.GESTOR, UsuarioSesion.RESPONSABLE, UsuarioSesion.GERENTE);
+        u.exigir("definir planes de mitigación", UsuarioSesion.GESTOR);
         Riesgo r = riesgo(u, idRiesgo);
         if (d.estrategia() == null) throw new ReglaNegocioException("CU03: Seleccione la estrategia de tratamiento");
         Long existe = dominio.em().createQuery("SELECT count(p) FROM PlanMitigacion p WHERE p.idRiesgo = :r", Long.class)
@@ -75,7 +75,7 @@ public class ServicioTratamiento {
 
     @Transactional
     public Map<String, Object> agregarAccion(UsuarioSesion u, int idRiesgo, NuevaAccion a) {
-        u.exigir("definir planes de mitigación", UsuarioSesion.GESTOR, UsuarioSesion.RESPONSABLE, UsuarioSesion.GERENTE);
+        u.exigir("definir planes de mitigación", UsuarioSesion.GESTOR);
         riesgo(u, idRiesgo);
         PlanMitigacion p = plan(idRiesgo);
         if (!PlanMitigacion.BORRADOR.equals(p.getEstado())) {
@@ -92,7 +92,7 @@ public class ServicioTratamiento {
 
     @Transactional
     public void eliminarAccion(UsuarioSesion u, int idRiesgo, int idAccion) {
-        u.exigir("definir planes de mitigación", UsuarioSesion.GESTOR, UsuarioSesion.RESPONSABLE, UsuarioSesion.GERENTE);
+        u.exigir("definir planes de mitigación", UsuarioSesion.GESTOR);
         riesgo(u, idRiesgo);
         PlanMitigacion p = plan(idRiesgo);
         AccionMitigacion a = dominio.buscar(AccionMitigacion.class, idAccion, "La acción");
@@ -103,7 +103,7 @@ public class ServicioTratamiento {
 
     @Transactional
     public Map<String, Object> proponer(UsuarioSesion u, int idRiesgo) {
-        u.exigir("proponer tratamientos", UsuarioSesion.GESTOR, UsuarioSesion.RESPONSABLE, UsuarioSesion.GERENTE);
+        u.exigir("proponer tratamientos", UsuarioSesion.GESTOR);
         riesgo(u, idRiesgo);
         PlanMitigacion p = plan(idRiesgo);
         Long acciones = dominio.em().createQuery("SELECT count(a) FROM AccionMitigacion a WHERE a.idPlan = :p", Long.class)

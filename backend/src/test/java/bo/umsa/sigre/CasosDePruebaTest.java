@@ -46,6 +46,7 @@ import bo.umsa.sigre.monitoreo.ServicioAlertas;
         "spring.flyway.url=jdbc:postgresql://${sigre.bd.host}:${sigre.bd.puerto}/${sigre.bd.nombre-pruebas}",
         "spring.flyway.clean-disabled=false",
         "sigre.simulador.activo=false",
+        "sigre.demo.habilitado=true",
         "sigre.tareas.notificacion-ms=1000",
         "sigre.tareas.escalamiento-ms=3600000",
         "sigre.tareas.alertas-programadas-ms=3600000",
@@ -248,7 +249,7 @@ class CasosDePruebaTest {
     void cp10() throws Exception {
         int kri = jdbc.queryForObject("SELECT id_kri FROM indicador_kri WHERE nombre = 'Variación mensual del tipo de cambio paralelo'", Integer.class);
         jdbc.queryForList("SELECT fn_cerrar_alerta_auto(id_alerta, 'Preparación de la prueba CP10') FROM alerta WHERE id_kri = ? AND estado NOT IN ('RESUELTA', 'CERRADA')", kri);
-        Respuesta r = post_("jcondori", "/api/kri/" + kri + "/mediciones", Map.of("valor", 5.8));
+        Respuesta r = post_("mquispe", "/api/kri/" + kri + "/mediciones", Map.of("valor", 5.8));
         assertThat(r.estado()).isEqualTo(200);
         assertThat(r.cuerpo().get("semaforo").asText()).isEqualTo("ROJO");
         JsonNode alerta = r.cuerpo().get("alerta");
@@ -264,7 +265,7 @@ class CasosDePruebaTest {
     @Order(110)
     @DisplayName("CP11 · CU06: una medición de 2,5 con umbral amarillo 3,0 queda en VERDE y no genera alerta")
     void cp11() throws Exception {
-        Respuesta r = post_("jcondori", "/api/kri/" + COMPARTIDO.get("kri") + "/mediciones", Map.of("valor", 2.5));
+        Respuesta r = post_("mquispe", "/api/kri/" + COMPARTIDO.get("kri") + "/mediciones", Map.of("valor", 2.5));
         assertThat(r.estado()).isEqualTo(200);
         assertThat(r.cuerpo().get("semaforo").asText()).isEqualTo("VERDE");
         assertThat(r.cuerpo().get("alerta").isNull()).isTrue();
@@ -300,7 +301,7 @@ class CasosDePruebaTest {
         assertThat(sinAccion.regla()).isEqualTo("CU08");
         Respuesta resuelta = post_(responsable, "/api/alertas/" + id + "/resolver", Map.of("accionCorrectiva", "Se activó la cobertura cambiaria con el banco"));
         assertThat(resuelta.cuerpo().get("estado").asText()).isEqualTo("RESUELTA");
-        assertThat(post_("mquispe", "/api/alertas/" + id + "/cerrar", null).cuerpo().get("estado").asText()).isEqualTo("CERRADA");
+        assertThat(post_(responsable, "/api/alertas/" + id + "/cerrar", null).cuerpo().get("estado").asText()).isEqualTo("CERRADA");
     }
 
     // ------------------------------------------------------------------ CU11 a CU16
@@ -485,5 +486,87 @@ class CasosDePruebaTest {
         assertThat(c.get("estado")).isEqualTo("CONCILIADA");
         assertThat(((BigDecimal) c.get("diferencia_pct")).setScale(1, RoundingMode.HALF_UP)).isEqualByComparingTo("1.2");
         assertThat(jdbc.queryForObject("SELECT count(*) FROM alerta WHERE id_conciliacion = ?", Integer.class, c.get("id_conciliacion"))).isZero();
+    }
+
+    // ------------------------------------------------------------------ Revisión de seguridad (correcciones verificadas)
+
+    @Test
+    @Order(300)
+    @DisplayName("S01 · Un cuerpo JSON mal formado responde 400 y no 200 vacío")
+    void s01() throws Exception {
+        MvcResult r = mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON).content("{mal")).andReturn();
+        assertThat(r.getResponse().getStatus()).isEqualTo(400);
+        assertThat(json.readTree(r.getResponse().getContentAsString()).get("tipo").asText()).isEqualTo("Validación");
+    }
+
+    @Test
+    @Order(310)
+    @DisplayName("S02 · RN14: un gerente de filial no ve integraciones ni usuarios de otras filiales")
+    void s02() throws Exception {
+        assertThat(get_("lparedes", "/api/integraciones").estado()).isEqualTo(403);
+        assertThat(get_("lparedes", "/api/erp/cierres").estado()).isEqualTo(403);
+        int filial = get_("lparedes", "/api/auth/yo").cuerpo().get("idFilial").asInt();
+        get_("lparedes", "/api/catalogos").cuerpo().get("usuarios")
+                .forEach(u -> assertThat(u.get("id_filial").asInt() == filial || u.get("corporativo").asBoolean()).isTrue());
+    }
+
+    @Test
+    @Order(320)
+    @DisplayName("S03 · Tabla 47: solo el Gestor registra riesgos (CU01) y mediciones manuales (CU06)")
+    void s03() throws Exception {
+        Respuesta r = post_("rgutierrez", "/api/riesgos", Map.of("idFilial", 1, "titulo", "Riesgo de prueba S03", "categoria", "OPERATIVO"));
+        assertThat(r.estado()).isEqualTo(403);
+        int kri = jdbc.queryForObject("SELECT id_kri FROM indicador_kri WHERE nombre = 'Variación mensual del tipo de cambio paralelo'", Integer.class);
+        assertThat(post_("jcondori", "/api/kri/" + kri + "/mediciones", Map.of("valor", 1.0)).estado()).isEqualTo(403);
+    }
+
+    @Test
+    @Order(330)
+    @DisplayName("S04 · Evidencias: un HTML disfrazado de PDF se rechaza y las evidencias se sirven con su tipo real")
+    void s04() throws Exception {
+        Map<String, Object> fila = jdbc.queryForMap("""
+                SELECT a.id_accion, u.login FROM accion_mitigacion a JOIN plan_mitigacion p USING (id_plan) JOIN usuario u ON u.id_usuario = a.id_responsable
+                WHERE a.estado <> 'CERRADA' AND p.estado = 'APROBADO' ORDER BY a.id_accion LIMIT 1""");
+        int accion = ((Number) fila.get("id_accion")).intValue();
+        String responsable = (String) fila.get("login");
+        var falso = new org.springframework.mock.web.MockMultipartFile("archivo", "informe.pdf", "text/html",
+                "<script>alert(1)</script>".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        MvcResult r = mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart("/api/acciones/" + accion + "/evidencias")
+                .file(falso).header("Authorization", "Bearer " + token(responsable))).andReturn();
+        assertThat(r.getResponse().getStatus()).isEqualTo(422);
+        var real = new org.springframework.mock.web.MockMultipartFile("archivo", "acta.pdf", "text/html",
+                "%PDF-1.4 prueba".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        MvcResult ok = mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart("/api/acciones/" + accion + "/evidencias")
+                .file(real).header("Authorization", "Bearer " + token(responsable))).andReturn();
+        assertThat(ok.getResponse().getStatus()).isEqualTo(200);
+        int evidencia = json.readTree(ok.getResponse().getContentAsString()).get("id_evidencia").asInt();
+        MvcResult archivo = mvc.perform(get("/api/evidencias/" + evidencia + "/archivo").header("Authorization", "Bearer " + token(responsable))).andReturn();
+        assertThat(archivo.getResponse().getContentType()).isEqualTo("application/pdf");
+        assertThat(archivo.getResponse().getHeader("Content-Security-Policy")).contains("sandbox");
+    }
+
+    @Test
+    @Order(340)
+    @DisplayName("S05 · Al desactivar un usuario su token deja de valer de inmediato")
+    void s05() throws Exception {
+        assertThat(get_("nacosta", "/api/auth/yo").estado()).isEqualTo(200);
+        int id = idUsuario("nacosta");
+        assertThat(llamar("admin", put("/api/admin/usuarios/" + id), Map.of("activo", false, "idSuperior", jdbc.queryForObject(
+                "SELECT id_superior FROM usuario WHERE id_usuario = ?", Integer.class, id))).estado()).isEqualTo(200);
+        assertThat(get_("nacosta", "/api/auth/yo").estado()).isEqualTo(401);
+        llamar("admin", put("/api/admin/usuarios/" + id), Map.of("activo", true, "idSuperior", jdbc.queryForObject(
+                "SELECT id_superior FROM usuario WHERE id_usuario = ?", Integer.class, id)));
+        TOKENS.remove("nacosta");
+    }
+
+    @Test
+    @Order(350)
+    @DisplayName("S06 · RF18: los reportes se exportan en PDF y CSV además de Excel")
+    void s06() throws Exception {
+        MvcResult pdf = mvc.perform(get("/api/reportes/riesgos.pdf").header("Authorization", "Bearer " + token("crojas"))).andReturn();
+        assertThat(pdf.getResponse().getStatus()).isEqualTo(200);
+        assertThat(new String(pdf.getResponse().getContentAsByteArray(), 0, 5, java.nio.charset.StandardCharsets.ISO_8859_1)).isEqualTo("%PDF-");
+        MvcResult csv = mvc.perform(get("/api/reportes/planes.csv").header("Authorization", "Bearer " + token("crojas"))).andReturn();
+        assertThat(csv.getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8)).startsWith("\uFEFF\"Riesgo\"");
     }
 }

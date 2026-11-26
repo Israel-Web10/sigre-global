@@ -11,6 +11,8 @@ export interface ItemNav {
   roles?: string[];
   cu?: string;
   movil?: boolean;
+  /** Clave de traducción del texto corto de la barra inferior del teléfono */
+  corta?: string;
 }
 
 const CORPORATIVOS = ['GESTOR', 'DIRECTOR', 'AUDITOR_INTERNO', 'AUDITOR_FINANCIERO', 'OFICIAL_CUMPLIMIENTO', 'ADMIN', 'GERENTE_FILIAL'];
@@ -19,7 +21,7 @@ export const NAVEGACION: ItemNav[] = [
   { ruta: '/', clave: 'tablero', icono: LayoutDashboard, grupo: 'principal', cu: 'CU14', movil: true },
   { ruta: '/riesgos', clave: 'riesgos', icono: ShieldAlert, grupo: 'principal', cu: 'CU01-CU02', movil: true },
   { ruta: '/aprobaciones', clave: 'aprobaciones', icono: Stamp, grupo: 'principal', roles: ['DIRECTOR', 'GERENTE_FILIAL'], cu: 'CU04' },
-  { ruta: '/mis-acciones', clave: 'misAcciones', icono: ListChecks, grupo: 'principal', roles: ['RESPONSABLE', 'GESTOR', 'GERENTE_FILIAL'], cu: 'CU05', movil: true },
+  { ruta: '/mis-acciones', clave: 'misAcciones', icono: ListChecks, grupo: 'principal', roles: ['RESPONSABLE', 'GESTOR', 'GERENTE_FILIAL'], cu: 'CU05', movil: true, corta: 'misAccionesCorto' },
   { ruta: '/kri', clave: 'kri', icono: Gauge, grupo: 'monitoreo', cu: 'CU06' },
   { ruta: '/alertas', clave: 'alertas', icono: Bell, grupo: 'monitoreo', cu: 'CU07-CU09', movil: true },
   { ruta: '/integraciones', clave: 'integraciones', icono: Network, grupo: 'monitoreo', roles: ['ADMIN', 'GESTOR', 'DIRECTOR'] },

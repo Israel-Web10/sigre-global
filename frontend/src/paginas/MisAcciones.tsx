@@ -91,10 +91,10 @@ function ModalAvance({ accion, cerrar, alGuardar }: { accion: Fila; cerrar: () =
       <div className="columna" style={{ gap: 18 }}>
         <div>
           <div className="fila entre"><span className="etiqueta-campo">Avance</span><strong style={{ fontSize: 26, fontFamily: 'var(--fuente-titulo)' }}>{avance} %</strong></div>
-          <input type="range" min={0} max={100} step={5} value={avance} onChange={(e) => setAvance(Math.max(Number(accion.avance), Number(e.target.value)))} style={{ width: '100%', accentColor: '#22d3ee' }} />
+          <input type="range" aria-label="Porcentaje de avance" aria-valuetext={`${avance} %`} min={0} max={100} step={5} value={avance} onChange={(e) => setAvance(Math.max(Number(accion.avance), Number(e.target.value)))} style={{ width: '100%', accentColor: '#22d3ee' }} />
           <div className="pequeno tenue">Mínimo {accion.avance} %: el avance no puede disminuir (CU05)</div>
         </div>
-        <textarea className="entrada" placeholder="Comentario del avance" value={comentario} onChange={(e) => setComentario(e.target.value)} />
+        <textarea className="entrada" aria-label="Comentario del avance" placeholder="Comentario del avance" value={comentario} onChange={(e) => setComentario(e.target.value)} />
         <ZonaArrastre alElegir={setArchivo} texto={archivo ? `📎 ${archivo.name}` : 'Adjunte la evidencia (obligatoria para cerrar al 100 %)'} />
         {avance === 100 && Number(accion.evidencias) === 0 && !archivo && <div className="item-verificacion no pequeno"><TriangleAlert size={16} /> Para cerrar la acción debe adjuntar una evidencia.</div>}
       </div>

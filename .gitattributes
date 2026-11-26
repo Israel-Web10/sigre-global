@@ -1,0 +1,16 @@
+# Finales de línea estables al clonar en cualquier equipo
+* text=auto
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+*.sh  text eol=lf
+herramientas/apache-maven-*/bin/mvn      text eol=lf
+herramientas/apache-maven-*/bin/mvnDebug text eol=lf
+herramientas/apache-maven-*/bin/mvnyjp   text eol=lf
+# Binarios
+*.png binary
+*.webp binary
+*.gif binary
+*.mp4 binary
+*.jar binary
+*.woff2 binary

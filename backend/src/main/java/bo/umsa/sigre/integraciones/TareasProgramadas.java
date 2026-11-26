@@ -87,6 +87,22 @@ public class TareasProgramadas {
         }
     }
 
+    /** RF23: el primer día de cada mes recuerda al Auditor Financiero conciliar el período cerrado (CU18). */
+    @Scheduled(cron = "0 0 7 1 * *")
+    public void recordarConciliacion() {
+        try {
+            String periodo = java.time.YearMonth.now().minusMonths(1).toString();
+            bd.lista("""
+                    SELECT fn_notificar(u.id_usuario, 'Conciliación mensual pendiente',
+                           'Concilie los KRI financieros del período ' || :p || ' con el cierre del ERP (CU18, RN18).', 'TAREA', '/conciliacion')
+                    FROM usuario u JOIN usuario_rol ur USING (id_usuario) JOIN rol r USING (id_rol)
+                    WHERE r.codigo = 'AUDITOR_FINANCIERO' AND u.activo""", java.util.Map.of("p", periodo));
+            anotar("conciliacion", "recordatorio del período " + periodo);
+        } catch (RuntimeException e) {
+            log.warn("Recordatorio de conciliación: {}", e.getMessage());
+        }
+    }
+
     @Scheduled(cron = "0 5 0 * * *")
     public void sincronizarErp() {
         try {

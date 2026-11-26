@@ -19,7 +19,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class ConfiguracionSeguridad {
 
     @Bean
-    SecurityFilterChain cadenaSeguridad(HttpSecurity http, JwtService jwt) throws Exception {
+    SecurityFilterChain cadenaSeguridad(HttpSecurity http, JwtService jwt, ValidadorSesiones sesiones) throws Exception {
         http.csrf(c -> c.disable())
             .httpBasic(b -> b.disable())
             .formLogin(f -> f.disable())
@@ -38,11 +38,13 @@ public class ConfiguracionSeguridad {
                 }))
             .authorizeHttpRequests(a -> a
                 .dispatcherTypeMatchers(jakarta.servlet.DispatcherType.ASYNC, jakarta.servlet.DispatcherType.ERROR).permitAll()
-                .requestMatchers("/api/auth/login", "/api/auth/2fa", "/api/auth/demo-usuarios", "/api/sistema/info").permitAll()
+                .requestMatchers("/api/auth/login", "/api/auth/2fa", "/api/auth/demo-usuarios", "/api/auth/demo", "/api/sistema/info").permitAll()
+                .requestMatchers("/actuator/health").permitAll()
+                .requestMatchers("/actuator/**").hasRole("ADMIN")
                 .requestMatchers("/api/**").authenticated()
                 .anyRequest().permitAll())
             .headers(h -> h.frameOptions(f -> f.sameOrigin()))
-            .addFilterBefore(new FiltroJwt(jwt), UsernamePasswordAuthenticationFilter.class);
+            .addFilterBefore(new FiltroJwt(jwt, sesiones), UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
 

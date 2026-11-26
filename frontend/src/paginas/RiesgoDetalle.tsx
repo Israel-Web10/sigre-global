@@ -200,11 +200,11 @@ function Resumen({ d, recargar }: { d: Fila; recargar: () => void }) {
               <span className="fila" style={{ gap: 6 }}>
                 <span className="pequeno tenue">efectividad</span>
                 {[1, 2, 3, 4, 5].map((n) => <i key={n} style={{ width: 8, height: 8, borderRadius: 4, background: n <= c.efectividad ? 'var(--acento)' : 'var(--superficie-3)', display: 'inline-block' }} />)}
-                {tiene('GESTOR', 'DIRECTOR') && <button className="icono-btn" onClick={() => api.del(`/api/riesgos/${r.id_riesgo}/controles/${c.id_control}`).then(recargar).catch(error)}><Trash2 size={14} /></button>}
+                {tiene('GESTOR') && <button className="icono-btn" aria-label="Eliminar control" onClick={() => api.del(`/api/riesgos/${r.id_riesgo}/controles/${c.id_control}`).then(recargar).catch(error)}><Trash2 size={14} /></button>}
               </span>
             </div>
           ))}
-          {tiene('GESTOR', 'RESPONSABLE', 'DIRECTOR') && r.estado !== 'CERRADO' && (
+          {tiene('GESTOR') && r.estado !== 'CERRADO' && (
             <div className="fila" style={{ gap: 8 }}>
               <input className="entrada crece" placeholder="Nuevo control…" value={control.descripcion ?? ''} onChange={(e) => setControl({ ...control, descripcion: e.target.value })} />
               <select className="entrada" style={{ width: 140 }} value={control.tipo} onChange={(e) => setControl({ ...control, tipo: e.target.value })}>

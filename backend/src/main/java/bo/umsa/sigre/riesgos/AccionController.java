@@ -61,12 +61,17 @@ public class AccionController {
             throws IOException {
         var par = acciones.archivo(UsuarioSesion.actual(), id);
         Path ruta = par.getValue();
-        String tipo = par.getKey().getTipoMime() != null ? par.getKey().getTipoMime() : Files.probeContentType(ruta);
-        ContentDisposition disp = (descargar ? ContentDisposition.attachment() : ContentDisposition.inline())
-                .filename(par.getKey().getArchivo()).build();
+        String nombre = par.getKey().getArchivo();
+        // El tipo se deduce de la extensión validada; solo PDF, imágenes y video se muestran en el navegador
+        String tipo = bo.umsa.sigre.comun.AlmacenEvidencias.tipoMime(nombre);
+        boolean enLinea = !descargar && bo.umsa.sigre.comun.AlmacenEvidencias.seguroEnLinea(nombre);
+        ContentDisposition disp = (enLinea ? ContentDisposition.inline() : ContentDisposition.attachment())
+                .filename(nombre, java.nio.charset.StandardCharsets.UTF_8).build();
         return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType(tipo == null ? "application/octet-stream" : tipo))
+                .contentType(MediaType.parseMediaType(tipo))
                 .header(HttpHeaders.CONTENT_DISPOSITION, disp.toString())
+                .header("Content-Security-Policy", "sandbox; default-src 'none'; img-src 'self' data:; media-src 'self'; style-src 'unsafe-inline'")
+                .header("X-Content-Type-Options", "nosniff")
                 .body(new FileSystemResource(ruta));
     }
 }

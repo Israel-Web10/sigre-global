@@ -6,6 +6,13 @@ export const colorNivel = (n?: string | null) =>
   ({ BAJO: 'var(--bajo)', MEDIO: 'var(--medio)', ALTO: 'var(--alto)', CRITICO: 'var(--critico)' } as Record<string, string>)[n ?? ''] ??
   'var(--texto-3)';
 
+/** Fondos más oscuros para distintivos con texto blanco (contraste WCAG AA). */
+export const colorNivelSolido = (n?: string | null) =>
+  ({ BAJO: 'var(--bajo-solido)', MEDIO: 'var(--medio-solido)', ALTO: 'var(--alto-solido)', CRITICO: 'var(--critico-solido)' } as Record<string, string>)[n ?? ''] ??
+  'var(--texto-3)';
+
+export const colorValorSolido = (v: number) => colorNivelSolido(v <= 4 ? 'BAJO' : v <= 9 ? 'MEDIO' : v <= 14 ? 'ALTO' : 'CRITICO');
+
 export const nivelDe = (v: number) => (v <= 4 ? 'BAJO' : v <= 9 ? 'MEDIO' : v <= 14 ? 'ALTO' : 'CRITICO');
 
 export const colorValor = (v: number) => colorNivel(nivelDe(v));

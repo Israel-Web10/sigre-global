@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import QRCode from 'qrcode';
 import { KeyRound, Mail, MessageSquareText, Palette, ShieldCheck, Smartphone, User } from 'lucide-react';
-import { api, type Fila } from '../nucleo/api';
+import { api, token, type Fila } from '../nucleo/api';
 import { useAvisos, useDatos, usePreferencias, useSesion } from '../nucleo/contexto';
 import { etiqueta, fechaHora } from '../nucleo/formato';
 import { Avatar, Campo, Encabezado, Interruptor, Pestanas, Tarjeta, Vacio } from '../componentes/Ui';
@@ -48,8 +48,9 @@ export default function Perfil() {
   };
   const cambiarClave = async () => {
     try {
-      await api.post('/api/auth/clave', claves);
-      avisar('exito', 'Clave actualizada');
+      const r = await api.post('/api/auth/clave', claves);
+      if (r?.token) token.guardar(r.token, !!localStorage.getItem('sigre.token'));
+      avisar('exito', 'Clave actualizada', 'Las demás sesiones abiertas con su cuenta se cerraron.');
       setClaves({ actual: '', nueva: '' });
     } catch (e) {
       error(e);

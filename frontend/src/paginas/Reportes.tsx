@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { BarChart3, Download, FileSpreadsheet, Printer, ShieldCheck } from 'lucide-react';
+import { BarChart3, Download, FileSpreadsheet, FileText, Printer, ShieldCheck } from 'lucide-react';
 import { descargar, type Fila } from '../nucleo/api';
 import { useAvisos, useDatos, useSesion } from '../nucleo/contexto';
 import { Encabezado, Girando, Tarjeta, Vacio } from '../componentes/Ui';
@@ -15,11 +15,11 @@ export default function Reportes() {
   const { datos: cat } = useDatos<Fila>('/api/catalogos');
   const [filial, setFilial] = useState('');
   const [bajando, setBajando] = useState<string | null>(null);
-  const bajar = async (r: Fila) => {
-    setBajando(r.clave);
+  const bajar = async (r: Fila, formato: 'xlsx' | 'pdf' | 'csv' = 'xlsx') => {
+    setBajando(`${r.clave}.${formato}`);
     try {
-      await descargar(`/api/reportes/${r.clave}.xlsx${filial ? `?filial=${filial}` : ''}`, `SIGRE_${r.clave}_${new Date().toISOString().slice(0, 10)}.xlsx`);
-      avisar('exito', 'Reporte generado', `${r.titulo} (Excel). La exportación quedó registrada en la bitácora.`);
+      await descargar(`/api/reportes/${r.clave}.${formato}${filial ? `?filial=${filial}` : ''}`, `SIGRE_${r.clave}_${new Date().toISOString().slice(0, 10)}.${formato}`);
+      avisar('exito', 'Reporte generado', `${r.titulo} (${formato.toUpperCase()}). La exportación quedó registrada en la bitácora.`);
     } catch (e) {
       error(e);
     } finally {
@@ -28,9 +28,9 @@ export default function Reportes() {
   };
   return (
     <>
-      <Encabezado icono={<BarChart3 size={22} />} titulo="Reportes" texto="Libros de Excel con filtros y encabezados listos para el comité de riesgos. El alcance respeta la filial del usuario (RN14).">
+      <Encabezado icono={<BarChart3 size={22} />} titulo="Reportes" texto="Reportes en Excel, PDF o CSV listos para el comité de riesgos (RF18, RF24). El alcance respeta la filial del usuario (RN14).">
         {usuario?.corporativo && (
-          <select className="entrada" style={{ width: 220 }} value={filial} onChange={(e) => setFilial(e.target.value)}>
+          <select className="entrada" style={{ width: 220 }} aria-label="Filial del reporte" value={filial} onChange={(e) => setFilial(e.target.value)}>
             <option value="">Todas las filiales</option>{(cat?.filiales ?? []).map((f: Fila) => <option key={f.id_filial} value={f.id_filial}>{f.nombre}</option>)}
           </select>
         )}
@@ -45,9 +45,17 @@ export default function Reportes() {
               <span className="icono-titulo" style={{ color: COLORES[k % COLORES.length], background: `${COLORES[k % COLORES.length]}1f` }}><FileSpreadsheet size={20} /></span>
               <h3 style={{ margin: '14px 0 6px' }}>{r.titulo}</h3>
               <p className="pequeno suave" style={{ minHeight: 38 }}>{r.descripcion}</p>
-              <button className="boton primario bloque" style={{ marginTop: 14 }} disabled={!!bajando} onClick={() => bajar(r)}>
-                {bajando === r.clave ? <Girando /> : <Download size={16} />} Descargar Excel
-              </button>
+              <div className="fila" style={{ marginTop: 14, gap: 8, flexWrap: 'nowrap' }}>
+                <button className="boton primario crece" disabled={!!bajando} onClick={() => bajar(r, 'xlsx')}>
+                  {bajando === `${r.clave}.xlsx` ? <Girando /> : <Download size={16} />} Excel
+                </button>
+                <button className="boton crece" disabled={!!bajando} onClick={() => bajar(r, 'pdf')}>
+                  {bajando === `${r.clave}.pdf` ? <Girando /> : <FileText size={16} />} PDF
+                </button>
+                <button className="boton" disabled={!!bajando} onClick={() => bajar(r, 'csv')} title="CSV separado por punto y coma" aria-label={`Descargar ${r.titulo} en CSV`}>
+                  {bajando === `${r.clave}.csv` ? <Girando /> : 'CSV'}
+                </button>
+              </div>
             </Tarjeta>
           ))}
         </div>

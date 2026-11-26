@@ -45,7 +45,7 @@ public class ServicioAcciones {
 
     private AccionMitigacion accionPropia(UsuarioSesion u, int idAccion) {
         AccionMitigacion a = dominio.buscar(AccionMitigacion.class, idAccion, "La acción");
-        if (!a.getIdResponsable().equals(u.id()) && !u.tieneAlguno(UsuarioSesion.GESTOR, UsuarioSesion.DIRECTOR)) {
+        if (!a.getIdResponsable().equals(u.id())) {
             throw ReglaNegocioException.prohibido("CU05: Solo el responsable de la acción registra su avance");
         }
         Integer filial = bd.valor("""
@@ -73,7 +73,7 @@ public class ServicioAcciones {
         if ("CERRADA".equals(a.getEstado())) throw new ReglaNegocioException("CU05: La acción ya está cerrada");
         String ruta = almacen.guardar(archivo, "acciones/" + idAccion);
         Evidencia e = Evidencia.deAccion(idAccion, u.id(), AlmacenEvidencias.limpiarNombre(archivo.getOriginalFilename()),
-                archivo.getContentType(), archivo.getSize(), descripcion);
+                AlmacenEvidencias.tipoMime(archivo.getOriginalFilename()), archivo.getSize(), descripcion);
         e.ubicar(ruta);
         dominio.guardar(e);
         return Map.of("id_evidencia", e.getId(), "archivo", e.getArchivo());

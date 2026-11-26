@@ -29,14 +29,22 @@ public class IntegracionesController {
     private final ServicioEventos eventos;
     private final TareasProgramadas tareas;
     private final Consultas bd;
+    private final boolean demo;
 
     public IntegracionesController(ServicioErp erp, SimuladorIntegraciones simulador, ServicioEventos eventos,
-                                   TareasProgramadas tareas, Consultas bd) {
+                                   TareasProgramadas tareas, Consultas bd,
+                                   @org.springframework.beans.factory.annotation.Value("${sigre.demo.habilitado:false}") boolean demo) {
         this.erp = erp;
         this.simulador = simulador;
         this.eventos = eventos;
         this.tareas = tareas;
         this.bd = bd;
+        this.demo = demo;
+    }
+
+    private void soloDemo() {
+        if (!demo) throw new bo.umsa.sigre.comun.ReglaNegocioException("La simulación de integraciones solo existe en el modo de demostración",
+                org.springframework.http.HttpStatus.NOT_FOUND);
     }
 
     public record Simulador(Boolean activo) { }
@@ -56,13 +64,17 @@ public class IntegracionesController {
     @GetMapping("/api/erp/cierres")
     @Operation(summary = "ERP: cierres contables mensuales de los KRI financieros (RN18)")
     public List<Map<String, Object>> cierres(@RequestParam(required = false) String periodo) {
+        UsuarioSesion.actual().exigir("consultar los cierres del ERP", UsuarioSesion.AUDITOR_FINANCIERO, UsuarioSesion.AUDITOR_INTERNO,
+                UsuarioSesion.DIRECTOR, UsuarioSesion.GESTOR);
         return erp.cierres(periodo);
     }
 
     @GetMapping("/api/integraciones")
     @Operation(summary = "Estado de las integraciones, el simulador y las tareas programadas")
     public Map<String, Object> estado() {
+        UsuarioSesion.actual().exigir("ver las integraciones", UsuarioSesion.ADMIN, UsuarioSesion.GESTOR, UsuarioSesion.DIRECTOR);
         Map<String, Object> m = new LinkedHashMap<>();
+        m.put("demo", demo);
         m.put("simulador", simulador.estado());
         m.put("eventos", eventos.estado());
         m.put("tareas", tareas.estado());
@@ -93,6 +105,7 @@ public class IntegracionesController {
     @Operation(summary = "Encender o apagar el simulador del ERP y el SIEM")
     public Map<String, Object> simulador(@RequestBody Simulador s) {
         UsuarioSesion.actual().exigir("administrar integraciones", UsuarioSesion.ADMIN, UsuarioSesion.GESTOR, UsuarioSesion.DIRECTOR);
+        soloDemo();
         simulador.activar(Boolean.TRUE.equals(s.activo()));
         return simulador.estado();
     }
@@ -102,6 +115,7 @@ public class IntegracionesController {
     public Map<String, Object> evento(@PathVariable int id, @RequestBody Evento e) {
         UsuarioSesion u = UsuarioSesion.actual();
         u.exigir("simular eventos", UsuarioSesion.ADMIN, UsuarioSesion.GESTOR, UsuarioSesion.DIRECTOR);
+        soloDemo();
         Integer filial = bd.valor("SELECT r.id_filial FROM indicador_kri k JOIN riesgo r USING (id_riesgo) WHERE k.id_kri = :k",
                 p("k", id), Integer.class);
         u.exigirFilial(filial);

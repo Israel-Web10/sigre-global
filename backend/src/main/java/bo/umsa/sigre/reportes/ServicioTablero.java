@@ -19,10 +19,14 @@ public class ServicioTablero {
         this.bd = bd;
     }
 
-    public Map<String, Object> tablero(UsuarioSesion u, Integer filial, String categoria) {
+    public Map<String, Object> tablero(UsuarioSesion u, Integer filial, String categoria, String region, int dias) {
+        int periodo = Math.max(7, Math.min(dias, 366));
         Condiciones c = new Condiciones().alcance(u, "v.id_filial")
                 .si(filial, "v.id_filial = :filial", "filial")
-                .si(categoria, "v.categoria = :categoria", "categoria");
+                .si(categoria, "v.categoria = :categoria", "categoria")
+                // RF17: filtro por región (se expresa sobre la filial para reutilizarlo en alertas y obligaciones)
+                .si(region, "v.id_filial IN (SELECT id_filial FROM filial WHERE region = :region)", "region")
+                .param("dias", periodo);
         String w = " WHERE v.estado <> 'CERRADO'" + c.sql();
         Map<String, Object> p = c.params();
         Map<String, Object> t = new LinkedHashMap<>();
@@ -90,7 +94,8 @@ public class ServicioTablero {
                                / nullif(count(*) FILTER (WHERE o.estado_cumplimiento <> 'PENDIENTE'), 0), 1)
                         FROM obligacion o WHERE o.id_filial = f.id_filial) AS cumplimiento_pct
                 FROM filial f LEFT JOIN v_riesgo v ON v.id_filial = f.id_filial""" + c.sql().replace(" AND v.id_filial = :alcance_filial", "")
-                + (u.corporativo() ? " WHERE TRUE" : " WHERE f.id_filial = :alcance_filial") + " " + """
+                + (u.corporativo() ? " WHERE TRUE" : " WHERE f.id_filial = :alcance_filial")
+                + (region == null || region.isBlank() ? "" : " AND f.region = :region") + " " + """
                  GROUP BY f.id_filial ORDER BY f.casa_matriz DESC, f.nombre""", p));
         t.put("top_riesgos", bd.lista("""
                 SELECT v.id_riesgo, v.codigo, v.titulo, v.categoria, v.filial, v.codigo_pais, v.nivel, v.valor, v.estado,
@@ -110,7 +115,7 @@ public class ServicioTablero {
                        count(a.id_alerta) FILTER (WHERE a.severidad = 'CRITICA') AS criticas,
                        count(a.id_alerta) FILTER (WHERE a.severidad = 'ADVERTENCIA') AS advertencias,
                        count(a.id_alerta) FILTER (WHERE a.severidad = 'PREVENTIVA') AS preventivas
-                FROM generate_series(CURRENT_DATE - 29, CURRENT_DATE, interval '1 day') d
+                FROM generate_series(CURRENT_DATE - (CAST(:dias AS int) - 1), CURRENT_DATE, interval '1 day') d
                 LEFT JOIN v_alerta a ON a.fecha_generacion::date = d::date""" + c.sql().replace("v.id_filial", "a.id_filial")
                 .replaceAll(" AND v\\.categoria = :categoria", " AND a.categoria = :categoria") + " " + """
                  GROUP BY d ORDER BY d""", p));
@@ -138,6 +143,21 @@ public class ServicioTablero {
                        coalesce(u.nombre_completo, 'Sistema') AS usuario
                 FROM bitacora b LEFT JOIN usuario u USING (id_usuario)""" + (u.corporativo() ? "" : " WHERE b.id_usuario = :yo") + " " + """
                  ORDER BY b.fecha_hora DESC, b.id_bitacora DESC LIMIT 12""", c.param("yo", u.id()).params()));
+        String filtroAlertas = c.sql().replace("v.id_filial", "a.id_filial").replace("v.categoria", "a.categoria");
+        t.put("alertas_abiertas", bd.lista("""
+                SELECT a.id_alerta, a.tipo, a.severidad, a.estado, a.mensaje, a.asignado, a.segundos_restantes, a.sla_vencido,
+                       a.riesgo_codigo, a.filial, a.nivel_escalamiento
+                FROM v_alerta a WHERE a.estado NOT IN ('RESUELTA', 'CERRADA')""" + filtroAlertas + " " + """
+                 ORDER BY CASE a.severidad WHEN 'CRITICA' THEN 0 WHEN 'ADVERTENCIA' THEN 1 ELSE 2 END, a.fecha_limite LIMIT 8""", p));
+        String filtroObligaciones = c.sql().replace("v.id_filial", "o.id_filial").replaceAll(" AND v\\.categoria = :categoria", "");
+        t.put("obligaciones_por_vencer", bd.lista("""
+                SELECT o.id_obligacion, o.descripcion, n.nombre AS normativa, n.organismo, f.nombre AS filial, f.codigo_pais,
+                       o.fecha_vencimiento, (o.fecha_vencimiento - CURRENT_DATE) AS dias
+                FROM obligacion o JOIN normativa n USING (id_normativa) JOIN filial f ON f.id_filial = o.id_filial
+                WHERE o.estado_cumplimiento = 'PENDIENTE' AND o.fecha_vencimiento <= CURRENT_DATE + 30""" + filtroObligaciones + " " + """
+                 ORDER BY o.fecha_vencimiento LIMIT 8""", p));
+        t.put("regiones", bd.jdbc().queryForList("SELECT DISTINCT region FROM filial WHERE activa ORDER BY 1", Map.of(), String.class));
+        t.put("periodo_dias", periodo);
         return t;
     }
 }
